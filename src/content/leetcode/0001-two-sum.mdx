@@ -1,0 +1,33 @@
+---
+problemId: 1
+title: "Two Sum"
+date: 2026-05-30
+difficulty: Easy
+tags: [hash-table, array]
+private: false
+---
+
+## Thought process
+
+Brute force is O(n²) — check every pair. The trick is to remember what you've already seen: while scanning, store `value → index` in a hash map. When you see `x`, check if `target - x` is in the map.
+
+## Complexity
+
+- Time: **O(n)** — single pass
+- Space: **O(n)** — hash map
+
+## Code
+
+```python
+def two_sum(nums: list[int], target: int) -> list[int]:
+    seen = {}
+    for i, x in enumerate(nums):
+        if target - x in seen:
+            return [seen[target - x], i]
+        seen[x] = i
+    return []
+```
+
+## Pitfalls
+
+- Don't add the current number to the map *before* checking the complement — it would let `x = target/2` pair with itself.

@@ -1,0 +1,66 @@
+---
+const path = Astro.url.pathname;
+const isActive = (p: string) => p === '/' ? path === '/' : path.startsWith(p);
+
+const items = [
+  { href: '/about', label: 'About' },
+  { href: '/experience', label: 'Work blog' },
+  { href: '/learning', label: 'Study' },
+  { href: '/projects', label: 'Project' },
+  { href: '/leetcode', label: 'LeetCode' },
+  { href: '/contact', label: 'Connect me' },
+];
+---
+<header>
+  <nav>
+    <a href="/" class="brand">jingyuan.dev</a>
+    <div class="links">
+      {items.map((it) => (
+        <a href={it.href} class:list={['link', isActive(it.href) && 'active']}>{it.label}</a>
+      ))}
+    </div>
+  </nav>
+</header>
+<style>
+  header {
+    max-width: 880px;
+    margin: 1.5rem auto 0;
+    padding: 0 1.25rem;
+  }
+  nav {
+    background: var(--card-bg);
+    border: 3px solid var(--border);
+    outline: 3px solid var(--border-dark);
+    box-shadow: 4px 4px 0 var(--shadow);
+    padding: 0.6rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .brand {
+    font-family: 'Pixelify Sans', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: none;
+  }
+  .brand:hover { color: var(--accent-3); }
+  .links {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .link {
+    color: var(--fg);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.2rem 0.5rem;
+    font-weight: 500;
+  }
+  .link:hover { color: var(--accent); border-bottom-color: transparent; }
+  .link.active { color: var(--accent); border-bottom-color: var(--accent); }
+</style>

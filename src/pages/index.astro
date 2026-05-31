@@ -1,0 +1,1286 @@
+﻿---
+import { getVisibleEntries } from '../lib/content';
+
+const [learning, projects, experience, leetcode] = await Promise.all([
+  getVisibleEntries('learning', Astro.request),
+  getVisibleEntries('projects', Astro.request),
+  getVisibleEntries('experience', Astro.request),
+  getVisibleEntries('leetcode', Astro.request),
+]);
+
+const fmtDate = (d?: Date) => d ? d.toISOString().slice(0, 10) : '';
+const fmtMonth = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
+
+const PORTAL_DATA = {
+  learning: learning.map((e) => ({
+    id: e.id,
+    title: e.data.title,
+    date: fmtDate(e.data.date),
+    tags: e.data.tags ?? [],
+    summary: e.data.summary ?? '',
+  })),
+  projects: projects.map((e) => ({
+    id: e.id,
+    title: e.data.title,
+    repo: e.data.repo ?? '',
+    demo: e.data.demo ?? '',
+    tech: e.data.tech ?? [],
+    summary: e.data.summary ?? '',
+  })),
+  experience: experience.map((e) => ({
+    id: e.id,
+    title: e.data.title,
+    company: e.data.company,
+    location: e.data.location ?? '',
+    startDate: fmtMonth(e.data.startDate),
+    endDate: fmtMonth(e.data.endDate),
+    tech: e.data.tech ?? [],
+    summary: e.data.summary ?? '',
+  })),
+  leetcode: leetcode
+    .slice()
+    .sort((a, b) => a.data.problemId - b.data.problemId)
+    .map((e) => ({
+      id: e.id,
+      problemId: e.data.problemId,
+      title: e.data.title,
+      difficulty: e.data.difficulty,
+      tags: e.data.tags ?? [],
+      date: fmtDate(e.data.date),
+    })),
+};
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Walk around my little farm." />
+    <title>jingyuan.dev</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="phaser-container" class="phaser-fullscreen" tabindex="0">
+      <noscript>
+        <p class="noscript">
+          The farm map needs JavaScript. <a href="/list">Use the list view</a> instead.
+        </p>
+      </noscript>
+    </div>
+
+    <!-- Top nav (opens modal on click, no navigation) -->
+    <header class="map-nav">
+      <span class="map-nav-brand">jingyuan.dev</span>
+      <nav class="map-nav-links">
+        <button class="map-nav-btn" type="button" data-route="/about">About</button>
+        <button class="map-nav-btn" type="button" data-route="/experience">Work blog</button>
+        <button class="map-nav-btn" type="button" data-route="/learning">Study</button>
+        <button class="map-nav-btn" type="button" data-route="/projects">Project</button>
+        <button class="map-nav-btn" type="button" data-route="/leetcode">LeetCode</button>
+        <button class="map-nav-btn" type="button" data-route="/contact">Connect me</button>
+      </nav>
+    </header>
+
+    <!-- Bottom-left device button + full map / fast travel -->
+    <button id="minimap-toggle" class="minimap-toggle" type="button" aria-controls="minimap" aria-expanded="false">
+      <span class="minimap-toggle-screen">
+        <img src="/assets/map/generated/static_tiles_merged_render.png" alt="" />
+        <span class="minimap-toggle-dot dot-a"></span>
+        <span class="minimap-toggle-dot dot-b"></span>
+        <span class="minimap-toggle-dot dot-c"></span>
+        <span class="minimap-toggle-player"></span>
+      </span>
+      <span class="sr-only">Open village map</span>
+    </button>
+    <aside id="minimap" class="minimap" aria-label="Village map" aria-hidden="true">
+      <div class="minimap-backdrop" data-map-close></div>
+      <section class="minimap-panel" role="dialog" aria-modal="true" aria-labelledby="minimap-title">
+        <header class="minimap-head">
+          <div>
+            <h2 id="minimap-title">Village Map</h2>
+            <p>Click a sign to fly there. The white dot is you.</p>
+          </div>
+          <button class="minimap-close" type="button" data-map-close aria-label="Close map">×</button>
+        </header>
+        <div class="minimap-frame">
+          <img src="/assets/map/generated/static_tiles_merged_render.png" class="minimap-img" alt="" />
+          <div class="minimap-grid"></div>
+          <div class="minimap-overlay">
+            <div class="minimap-markers" id="minimap-markers"></div>
+            <div class="minimap-player" id="minimap-player"></div>
+          </div>
+        </div>
+        <p class="minimap-hint" id="minimap-hint">Choose a destination.</p>
+      </section>
+    </aside>
+
+    <div class="mobile-controls" aria-label="Movement controls">
+      <div class="mobile-dpad">
+        <button type="button" data-vkey="up" class="dpad-btn up" aria-label="Move up">^</button>
+        <button type="button" data-vkey="left" class="dpad-btn left" aria-label="Move left">&lt;</button>
+        <button type="button" data-vkey="down" class="dpad-btn down" aria-label="Move down">v</button>
+        <button type="button" data-vkey="right" class="dpad-btn right" aria-label="Move right">&gt;</button>
+      </div>
+      <a class="mobile-list" href="/list">List</a>
+    </div>
+
+    <!-- Loading overlay (shown first while Phaser loads) -->
+    <div id="loading-overlay" class="boot-overlay loading-overlay">
+      <div class="loading-content">
+        <div class="loading-dot"></div>
+        <div class="loading-dot"></div>
+        <div class="loading-dot"></div>
+        <p class="loading-text">Loading village...</p>
+      </div>
+    </div>
+
+    <!-- Landing screen (after loading, before PLAY) -->
+    <div id="landing-overlay" class="boot-overlay landing-overlay" hidden>
+      <div class="landing-content">
+        <p class="landing-tagline">Software engineer - Algorithms - Side projects</p>
+        <h1 class="landing-title">
+          <span>JINGYUAN</span>
+          <span>WANG</span>
+        </h1>
+        <p class="landing-portfolio">- PORTFOLIO -</p>
+        <button class="landing-play" type="button" id="play-btn">PLAY</button>
+        <p class="landing-hint">
+          use
+          <span class="kbd-cross">
+            <kbd>^</kbd>
+            <span class="kbd-cross-row"><kbd>&lt;</kbd><kbd>v</kbd><kbd>&gt;</kbd></span>
+          </span>
+          or <kbd>WASD</kbd> - walk into a building
+        </p>
+        <p class="landing-alt">
+          No time to explore? <a href="https://github.com/jing0728" target="_blank" rel="noopener">GitHub -></a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Portal modal overlay -->
+    <div id="portal-modal" class="portal-modal">
+      <div class="modal-backdrop" data-modal-close></div>
+      <article class="modal-frame" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+        <header class="modal-title">
+          <span class="modal-icon" id="modal-icon">HOME</span>
+          <h2 id="modal-title-text">Title</h2>
+          <button class="modal-close" type="button" data-modal-close aria-label="Close">x</button>
+        </header>
+        <div class="modal-body" id="modal-body"></div>
+        <footer class="modal-footer">
+          <a id="modal-cta" class="modal-btn" href="/">Open full layout -></a>
+        </footer>
+      </article>
+    </div>
+
+    <!-- Server-rendered data for the modal -->
+    <script id="portal-data" type="application/json" set:html={JSON.stringify(PORTAL_DATA)}></script>
+
+    <script>
+      import { startFarm } from '../game/farm';
+
+      type LeetItem = { id: string; problemId: number; title: string; difficulty: string; tags: string[]; date: string };
+      type LearnItem = { id: string; title: string; date: string; tags: string[]; summary: string };
+      type ProjectItem = { id: string; title: string; repo: string; demo: string; tech: string[]; summary: string };
+      type ExpItem = { id: string; title: string; company: string; location: string; startDate: string; endDate: string; tech: string[]; summary: string };
+
+      const data = JSON.parse(document.getElementById('portal-data')!.textContent || '{}') as {
+        learning: LearnItem[]; projects: ProjectItem[]; experience: ExpItem[]; leetcode: LeetItem[];
+      };
+
+      const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+      const tagsHtml = (tags: string[]) => tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
+
+      const renderers: Record<string, () => { meta: { icon: string; title: string; cta: string; ctaHref: string }; bodyHtml: string }> = {
+        '/about': () => ({
+          meta: { icon: 'ME', title: 'About me', cta: 'Open full About ->', ctaHref: '/about' },
+          bodyHtml: `
+            <p class="lead">Hi, I'm <strong>Jingyuan Wang</strong>. I build things on the web - backends, tools, and small experiments like this farm.</p>
+            <p>Walk into the buildings to peek at what I'm working on. Or use the minimap on the left to fast-travel.</p>
+            <p class="muted">Edit the full version at <code>src/pages/about.astro</code>.</p>
+          `,
+        }),
+        '/contact': () => ({
+          meta: { icon: '@', title: 'Connect me', cta: 'Open full Contact ->', ctaHref: '/contact' },
+          bodyHtml: `
+            <p>Want to chat about work, collaboration, or just say hi?</p>
+            <ul class="link-list">
+              <li><strong>GitHub:</strong> <a href="https://github.com/jing0728" target="_blank" rel="noopener">@jing0728</a></li>
+              <li><strong>Email:</strong> <a href="mailto:jingyuan0110@gmail.com">jingyuan0110@gmail.com</a></li>
+            </ul>
+          `,
+        }),
+        '/resume': () => ({
+          meta: { icon: 'CV', title: 'Resume', cta: 'Open full Resume ->', ctaHref: '/experience' },
+          bodyHtml: `
+            <p>Short version of my career. The full Work blog has long-form write-ups.</p>
+            ${data.experience.length === 0
+              ? `<p class="muted">No roles added yet - see <code>src/content/experience/</code>.</p>`
+              : `<ul class="list">
+                  ${data.experience.map((e) => `
+                    <li class="row">
+                      <a class="row-link" href="/experience/${esc(e.id)}">
+                        <div class="row-main">
+                          <span class="row-title">${esc(e.title)}</span>
+                          <span class="row-muted"> - ${esc(e.company)}</span>
+                        </div>
+                        <span class="row-side">${esc(e.startDate)} - ${esc(e.endDate)}</span>
+                      </a>
+                    </li>
+                  `).join('')}
+                </ul>`
+            }
+          `,
+        }),
+        '/experience': () => ({
+          meta: { icon: 'WB', title: 'Work blog', cta: 'Open full Work blog ->', ctaHref: '/experience' },
+          bodyHtml: data.experience.length === 0
+            ? `<p class="muted">No entries yet. Add MDX files under <code>src/content/experience/</code>.</p>`
+            : `<p class="lead">${data.experience.length} role${data.experience.length === 1 ? '' : 's'} logged.</p>
+               <ul class="list">
+                 ${data.experience.map((e) => `
+                   <li class="card">
+                     <a class="card-link" href="/experience/${esc(e.id)}">
+                       <div class="card-head">
+                         <span class="card-title">${esc(e.title)}</span>
+                         <span class="card-date">${esc(e.startDate)} - ${esc(e.endDate)}</span>
+                       </div>
+                       <div class="card-sub">${esc(e.company)}${e.location ? ` - ${esc(e.location)}` : ''}</div>
+                       ${tagsHtml(e.tech)}
+                       ${e.summary ? `<p class="card-summary">${esc(e.summary)}</p>` : ''}
+                     </a>
+                   </li>
+                 `).join('')}
+               </ul>`,
+        }),
+        '/projects': () => ({
+          meta: { icon: 'PJ', title: 'Projects', cta: 'Open full Projects ->', ctaHref: '/projects' },
+          bodyHtml: data.projects.length === 0
+            ? `<p class="muted">No projects yet. Add MDX files under <code>src/content/projects/</code>.</p>`
+            : `<p class="lead">${data.projects.length} project${data.projects.length === 1 ? '' : 's'}.</p>
+               <ul class="list">
+                 ${data.projects.map((p) => `
+                   <li class="card">
+                     <div class="card-head">
+                       <a class="card-title" href="/projects/${esc(p.id)}">${esc(p.title)}</a>
+                       <div class="card-actions">
+                         ${p.repo ? `<a class="mini-btn" href="${esc(p.repo)}" target="_blank" rel="noopener">GitHub -></a>` : ''}
+                         ${p.demo ? `<a class="mini-btn alt" href="${esc(p.demo)}" target="_blank" rel="noopener">Demo -></a>` : ''}
+                       </div>
+                     </div>
+                     ${tagsHtml(p.tech)}
+                     ${p.summary ? `<p class="card-summary">${esc(p.summary)}</p>` : ''}
+                   </li>
+                 `).join('')}
+               </ul>`,
+        }),
+        '/learning': () => ({
+          meta: { icon: 'ST', title: 'Study notes', cta: 'Open full Study ->', ctaHref: '/learning' },
+          bodyHtml: data.learning.length === 0
+            ? `<p class="muted">No notes yet. Add MDX files under <code>src/content/learning/</code>.</p>`
+            : `<p class="lead">${data.learning.length} note${data.learning.length === 1 ? '' : 's'}.</p>
+               <ul class="list">
+                 ${data.learning.map((p) => `
+                   <li class="card">
+                     <a class="card-link" href="/learning/${esc(p.id)}">
+                       <div class="card-head">
+                         <span class="card-title">${esc(p.title)}</span>
+                         <span class="card-date">${esc(p.date)}</span>
+                       </div>
+                       ${tagsHtml(p.tags.map(t => `#${t}`))}
+                       ${p.summary ? `<p class="card-summary">${esc(p.summary)}</p>` : ''}
+                     </a>
+                   </li>
+                 `).join('')}
+               </ul>`,
+        }),
+        '/leetcode': () => ({
+          meta: { icon: 'LC', title: 'LeetCode', cta: 'Open full LeetCode ->', ctaHref: '/leetcode' },
+          bodyHtml: data.leetcode.length === 0
+            ? `<p class="muted">No problems yet. Add MDX files under <code>src/content/leetcode/</code>.</p>`
+            : `<p class="lead">${data.leetcode.length} problem${data.leetcode.length === 1 ? '' : 's'} solved.</p>
+               <ul class="leet-list">
+                 ${data.leetcode.map((p) => `
+                   <li>
+                     <a class="leet-row" href="/leetcode/${esc(p.id)}">
+                       <span class="leet-pid">#${p.problemId}</span>
+                       <span class="leet-title">${esc(p.title)}</span>
+                       <span class="leet-diff diff-${esc(p.difficulty.toLowerCase())}">${esc(p.difficulty)}</span>
+                     </a>
+                   </li>
+                 `).join('')}
+               </ul>`,
+        }),
+      };
+
+      let mapW = 640;
+      let mapH = 496;
+      let miniW = 640;
+      let miniH = 496;
+      let scaleX = miniW / mapW;
+      let scaleY = miniH / mapH;
+      let portalPoints: { x: number; y: number; label: string; route: string }[] = [];
+
+      const loadingOverlay = document.getElementById('loading-overlay')!;
+      const landingOverlay = document.getElementById('landing-overlay')!;
+      const playBtn = document.getElementById('play-btn')!;
+
+      // Phaser scene sends 'game-ready' when create() finished; show landing
+      window.addEventListener('game-ready', () => {
+        loadingOverlay.classList.add('is-fading');
+        setTimeout(() => {
+          loadingOverlay.hidden = true;
+          landingOverlay.hidden = false;
+          // Auto-pan camera while landing is showing
+          window.dispatchEvent(new CustomEvent('demo-tour-start'));
+        }, 350);
+      });
+
+      // PLAY hides landing and starts gameplay
+      playBtn.addEventListener('click', () => {
+        landingOverlay.classList.add('is-fading');
+        setTimeout(() => {
+          landingOverlay.hidden = true;
+          landingOverlay.classList.remove('is-fading');
+          document.body.classList.add('game-started');
+          window.dispatchEvent(new CustomEvent('game-start'));
+        }, 300);
+      });
+
+      const modal = document.getElementById('portal-modal')!;
+      const modalIcon = document.getElementById('modal-icon')!;
+      const modalTitle = document.getElementById('modal-title-text')!;
+      const modalBody = document.getElementById('modal-body')!;
+      const modalCta = document.getElementById('modal-cta') as HTMLAnchorElement;
+      const minimap = document.getElementById('minimap')!;
+      const minimapToggle = document.getElementById('minimap-toggle') as HTMLButtonElement;
+      const minimapFrame = document.querySelector<HTMLElement>('.minimap-frame')!;
+      const minimapHint = document.getElementById('minimap-hint')!;
+      const minimapMarkers = document.getElementById('minimap-markers')!;
+      const minimapPlayer = document.getElementById('minimap-player')!;
+
+      function refreshMapScale() {
+        const rect = minimapFrame.getBoundingClientRect();
+        miniW = rect.width || 640;
+        miniH = rect.height || 496;
+        scaleX = miniW / mapW;
+        scaleY = miniH / mapH;
+      }
+
+      function openMap() {
+        refreshMapScale();
+        minimap.classList.add('is-open');
+        minimap.setAttribute('aria-hidden', 'false');
+        minimapToggle.setAttribute('aria-expanded', 'true');
+        renderMapMarkers();
+      }
+
+      function closeMap() {
+        minimap.classList.remove('is-open');
+        minimap.setAttribute('aria-hidden', 'true');
+        minimapToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      function normalizeRoute(route: string | undefined): string {
+        if (!route) return '/';
+        const trimmed = route.trim();
+        if (!trimmed.startsWith('/')) return '/' + trimmed;
+        return trimmed;
+      }
+
+      function openModal(route: string, label: string) {
+        const render = renderers[route];
+        if (render) {
+          const { meta, bodyHtml } = render();
+          modalIcon.textContent = meta.icon;
+          modalTitle.textContent = meta.title;
+          modalBody.innerHTML = bodyHtml;
+          modalCta.textContent = meta.cta;
+          modalCta.href = meta.ctaHref;
+        } else {
+          modalIcon.textContent = 'PG';
+          modalTitle.textContent = label || 'Untitled';
+          modalBody.innerHTML = `<p class="muted">Content coming soon.</p>`;
+          modalCta.textContent = 'Open page ->';
+          modalCta.href = route || '/';
+        }
+        modalBody.scrollTop = 0;
+        modal.classList.add('is-open');
+        window.dispatchEvent(new CustomEvent('modal-opened'));
+      }
+
+      function closeModal() {
+        if (!modal.classList.contains('is-open')) return;
+        modal.classList.remove('is-open');
+        window.dispatchEvent(new CustomEvent('modal-closed'));
+      }
+
+      modal.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.dataset && target.dataset.modalClose !== undefined) closeModal();
+      });
+      minimapToggle.addEventListener('click', openMap);
+      minimap.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.dataset && target.dataset.mapClose !== undefined) closeMap();
+      });
+
+      // Top nav buttons open modal without navigation
+      document.querySelectorAll<HTMLButtonElement>('.map-nav-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const route = btn.dataset.route ?? '/';
+          if (modal.classList.contains('is-open')) closeModal();
+          openModal(route, btn.textContent?.trim() ?? '');
+        });
+      });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-vkey]').forEach((btn) => {
+        const key = btn.dataset.vkey as 'up' | 'down' | 'left' | 'right' | 'enter';
+        const send = (pressed: boolean) => {
+          window.dispatchEvent(new CustomEvent('virtual-input', { detail: { key, pressed } }));
+        };
+        btn.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          btn.setPointerCapture(event.pointerId);
+          send(true);
+        });
+        btn.addEventListener('pointerup', () => send(false));
+        btn.addEventListener('pointercancel', () => send(false));
+        btn.addEventListener('lostpointercapture', () => send(false));
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (modal.classList.contains('is-open')) {
+          e.preventDefault();
+          closeModal();
+        } else if (minimap.classList.contains('is-open')) {
+          e.preventDefault();
+          closeMap();
+        }
+      });
+
+      function renderMapMarkers() {
+        refreshMapScale();
+        minimapMarkers.innerHTML = '';
+        const seen = new Set<string>();
+        portalPoints.forEach((p) => {
+          const key = `${p.route}|${Math.round(p.x)}|${Math.round(p.y)}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          const m = document.createElement('button');
+          m.className = 'minimap-marker';
+          m.type = 'button';
+          m.style.left = `${p.x * scaleX - 8}px`;
+          m.style.top = `${p.y * scaleY - 8}px`;
+          m.dataset.x = String(p.x);
+          m.dataset.y = String(p.y);
+          m.dataset.route = normalizeRoute(p.route);
+          m.dataset.label = p.label;
+          m.innerHTML = `<span class="marker-dot"></span><span class="marker-label">${esc(p.label)}</span>`;
+          m.title = `${p.label} (fast travel)`;
+          m.addEventListener('click', () => {
+            minimapHint.textContent = `Flying to ${p.label}...`;
+            window.dispatchEvent(new CustomEvent('teleport-request', {
+              detail: {
+                x: parseFloat(m.dataset.x!),
+                y: parseFloat(m.dataset.y!),
+                route: m.dataset.route!,
+                label: m.dataset.label!,
+              },
+            }));
+          });
+          minimapMarkers.appendChild(m);
+        });
+      }
+
+      window.addEventListener('portal-open', (e) => {
+        const detail = (e as CustomEvent).detail as { route: string; label: string };
+        if (modal.classList.contains('is-open')) return;
+        openModal(normalizeRoute(detail.route), detail.label);
+      });
+      window.addEventListener('portal-close', closeModal);
+      window.addEventListener('teleport-start', (e) => {
+        const detail = (e as CustomEvent).detail as { label?: string };
+        closeModal();
+        closeMap();
+        minimapHint.textContent = detail?.label ? `Flying to ${detail.label}...` : 'Flying...';
+      });
+      window.addEventListener('teleport-end', () => {
+        minimapHint.textContent = 'Choose a destination.';
+      });
+
+      window.addEventListener('portals-ready', (e) => {
+        const detail = (e as CustomEvent).detail as {
+          mapW: number; mapH: number;
+          portals: { x: number; y: number; label: string; route: string }[];
+        };
+        mapW = detail.mapW;
+        mapH = detail.mapH;
+        portalPoints = detail.portals.map((p) => ({ ...p, route: normalizeRoute(p.route) }));
+        renderMapMarkers();
+      });
+
+      window.addEventListener('player-move', (e) => {
+        const detail = (e as CustomEvent).detail as { x: number; y: number };
+        minimapPlayer.style.left = `${detail.x * scaleX - 6}px`;
+        minimapPlayer.style.top = `${detail.y * scaleY - 6}px`;
+      });
+      window.addEventListener('resize', () => {
+        if (!minimap.classList.contains('is-open')) return;
+        renderMapMarkers();
+      });
+
+      function mount() {
+        const el = document.getElementById('phaser-container');
+        if (!el) return;
+        startFarm('phaser-container');
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mount);
+      } else {
+        mount();
+      }
+    </script>
+
+    <style is:global>
+      :root {
+        --fg: #3a2418;
+        --muted: #6b4d3a;
+        --accent: #c44d3a;
+        --accent-2: #5a8a3a;
+        --accent-3: #e89653;
+        --border: #8b6f47;
+        --border-dark: #5c4126;
+        --shadow: #3a2418;
+        --card-bg: #fff4d6;
+        --parchment: #f5e6c8;
+        --easy: #5a8a3a;
+        --medium: #c8852a;
+        --hard: #b03a2e;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        height: 100%; width: 100%;
+        overflow: hidden;
+        font-family: 'Pixelify Sans', system-ui, sans-serif;
+        background: #5a8a3a;
+        color: var(--fg);
+      }
+      .phaser-fullscreen { position: fixed; inset: 0; background: #5a8a3a; }
+      .phaser-fullscreen:focus { outline: none; }
+      .phaser-fullscreen canvas {
+        display: block !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        image-rendering: pixelated;
+      }
+      .noscript {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--card-bg); padding: 2rem; border: 3px solid var(--border);
+      }
+
+      /* === Boot overlays (loading / landing) === */
+      .boot-overlay {
+        position: fixed; inset: 0; z-index: 50;
+        display: flex; align-items: center; justify-content: center;
+        padding: 1rem;
+        transition: opacity 0.35s ease-out;
+      }
+      .boot-overlay.is-fading { opacity: 0; pointer-events: none; }
+      .boot-overlay[hidden] { display: none; }
+
+      .loading-overlay {
+        background: #1a1410;
+        color: #fff4d6;
+        flex-direction: column;
+      }
+      .loading-content { text-align: center; }
+      .loading-text {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 1.15rem; letter-spacing: 0.08em;
+        margin: 1rem 0 0; color: #fff4d6;
+      }
+      .loading-dot {
+        display: inline-block;
+        width: 14px; height: 14px;
+        margin: 0 4px;
+        background: #e89653;
+        animation: loading-pulse 1.2s ease-in-out infinite;
+      }
+      .loading-dot:nth-child(2) { animation-delay: 0.15s; background: #c44d3a; }
+      .loading-dot:nth-child(3) { animation-delay: 0.3s; background: #5a8a3a; }
+      @keyframes loading-pulse {
+        0%, 100% { transform: translateY(0); opacity: 0.4; }
+        50% { transform: translateY(-10px); opacity: 1; }
+      }
+
+      .landing-overlay {
+        background: rgba(20, 12, 8, 0.55);
+        backdrop-filter: blur(1px);
+        color: #fff4d6;
+      }
+      .landing-content {
+        text-align: center;
+        animation: landing-pop 0.45s ease-out;
+      }
+      @keyframes landing-pop {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .landing-tagline {
+        font-family: 'Pixelify Sans', monospace;
+        font-size: 0.95rem;
+        letter-spacing: 0.08em;
+        margin: 0 0 1.2rem;
+        color: #fff4d6;
+        text-shadow: 2px 2px 0 #1a0e08;
+      }
+      .landing-title {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: clamp(2.6rem, 7vw, 4.4rem);
+        font-weight: 700;
+        line-height: 1;
+        margin: 0;
+        letter-spacing: 0.04em;
+        color: #fff4d6;
+        text-shadow:
+          4px 4px 0 #1a0e08,
+          0 0 30px rgba(232, 150, 83, 0.4);
+      }
+      .landing-title span { display: block; }
+      .landing-portfolio {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 1.05rem;
+        letter-spacing: 0.5em;
+        margin: 0.6rem 0 1.6rem;
+        color: #e89653;
+        text-shadow: 2px 2px 0 #1a0e08;
+      }
+      .landing-play {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 0.15em;
+        color: #fff4d6;
+        background: #c44d3a;
+        border: 4px solid #5c4126;
+        outline: 4px solid #fff4d6;
+        box-shadow: 6px 6px 0 #1a0e08;
+        padding: 0.7rem 2.2rem;
+        cursor: pointer;
+        transition: transform 0.08s, box-shadow 0.08s;
+      }
+      .landing-play:hover {
+        background: #e89653;
+        transform: translate(2px, 2px);
+        box-shadow: 4px 4px 0 #1a0e08;
+      }
+      .landing-play:active {
+        transform: translate(6px, 6px);
+        box-shadow: 0 0 0 #1a0e08;
+      }
+      .landing-hint {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 0.85rem;
+        margin: 1.6rem 0 0.6rem;
+        color: #fff4d6;
+        opacity: 0.85;
+        text-shadow: 1px 1px 0 #1a0e08;
+      }
+      .landing-hint kbd {
+        display: inline-block;
+        padding: 0.05em 0.35em;
+        font-family: inherit;
+        font-size: 0.85em;
+        color: #fff4d6;
+        background: #3a2418;
+        border: 2px solid #1a0e08;
+        margin: 0 0.1em;
+        min-width: 1.4em;
+        text-align: center;
+        line-height: 1.2;
+      }
+      .kbd-cross {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        vertical-align: middle;
+        margin: 0 0.2em;
+      }
+      .kbd-cross-row { display: inline-flex; gap: 2px; }
+      .kbd-cross kbd { margin: 0; }
+      .landing-alt {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 0.85rem;
+        margin: 0.4rem 0 0;
+        color: #fff4d6;
+        opacity: 0.85;
+        text-shadow: 1px 1px 0 #1a0e08;
+      }
+      .landing-alt a {
+        color: #e89653;
+        text-decoration: underline;
+      }
+      .landing-alt a:hover { color: #fff4d6; }
+
+      /* Hide map UI until PLAY pressed */
+      .map-nav, .minimap-toggle, .minimap, .mobile-controls { display: none; }
+      body.game-started .map-nav { display: flex; }
+      body.game-started .minimap-toggle { display: block; }
+      body.game-started .mobile-controls { display: none; }
+
+      /* === TOP NAV (map page) === */
+      .map-nav {
+        position: fixed;
+        top: 12px; left: 50%;
+        transform: translateX(-50%);
+        z-index: 30;
+        background: #2a1a10;
+        border: 3px solid #5c4126;
+        outline: 3px solid #3a2418;
+        box-shadow: 4px 4px 0 var(--shadow);
+        padding: 0.45rem 0.85rem;
+        display: flex; align-items: center;
+        gap: 0.6rem;
+        max-width: calc(100vw - 24px);
+        flex-wrap: wrap;
+      }
+      .map-nav-brand {
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 1.15rem; font-weight: 700;
+        color: var(--accent);
+        margin-right: 0.4rem;
+      }
+      .map-nav-links { display: flex; gap: 0.1rem; flex-wrap: wrap; }
+      .map-nav-btn {
+        font-family: inherit; font-size: 0.95rem; font-weight: 600;
+        color: #fff4d6; background: transparent;
+        border: 2px solid transparent;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+      }
+      .map-nav-btn:hover {
+        color: var(--accent-3);
+      }
+      .map-nav-btn:active { transform: translate(1px, 1px); }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* === DEVICE MINIMAP + BIG MAP === */
+      .minimap-toggle {
+        position: fixed;
+        left: 18px;
+        bottom: 18px;
+        z-index: 38;
+        width: 172px;
+        height: 138px;
+        padding: 16px 15px 18px 27px;
+        background: #8f999b;
+        border: 5px solid #526063;
+        outline: 4px solid #d2d0c4;
+        box-shadow:
+          6px 6px 0 rgba(26, 14, 8, 0.45),
+          inset 5px 5px 0 rgba(255, 255, 255, 0.35),
+          inset -5px -5px 0 rgba(38, 45, 48, 0.45);
+        cursor: pointer;
+        image-rendering: pixelated;
+      }
+      .minimap-toggle::before,
+      .minimap-toggle::after {
+        content: "";
+        position: absolute;
+        left: -25px;
+        width: 24px;
+        height: 18px;
+        background: #a7b0b0;
+        border: 4px solid #526063;
+        border-right: 0;
+        box-shadow: inset 3px 3px 0 rgba(255,255,255,0.35);
+      }
+      .minimap-toggle::before { top: 36px; }
+      .minimap-toggle::after { top: 72px; }
+      .minimap-toggle-screen {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #16211d;
+        border: 4px solid #1a0e08;
+        outline: 3px solid #d8e4df;
+        overflow: hidden;
+      }
+      .minimap-toggle-screen img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+        opacity: 0.82;
+        filter: saturate(1.15) brightness(0.9);
+      }
+      .minimap-toggle-dot,
+      .minimap-toggle-player {
+        position: absolute;
+        z-index: 2;
+        box-shadow: 0 0 10px currentColor;
+      }
+      .minimap-toggle-dot {
+        width: 9px;
+        height: 9px;
+        background: currentColor;
+        border: 2px solid #fff4d6;
+      }
+      .minimap-toggle-dot.dot-a { left: 14%; top: 22%; color: #ff2f1f; }
+      .minimap-toggle-dot.dot-b { right: 15%; top: 18%; color: #ff2f1f; }
+      .minimap-toggle-dot.dot-c { left: 23%; bottom: 18%; color: #ff9b1f; }
+      .minimap-toggle-player {
+        left: 50%;
+        top: 47%;
+        width: 12px;
+        height: 12px;
+        transform: translate(-50%, -50%);
+        background: #fff4d6;
+        border: 3px solid #e89653;
+        border-radius: 50%;
+      }
+      .minimap-toggle:hover {
+        transform: translate(-2px, -2px);
+        box-shadow:
+          8px 8px 0 rgba(26, 14, 8, 0.45),
+          inset 5px 5px 0 rgba(255, 255, 255, 0.35),
+          inset -5px -5px 0 rgba(38, 45, 48, 0.45);
+      }
+      .minimap {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        user-select: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+      }
+      .minimap.is-open { display: flex; }
+      .minimap-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(26, 14, 8, 0.72);
+      }
+      .minimap-panel {
+        position: relative;
+        width: min(900px, 95vw);
+        background: #2a241c;
+        border: 6px solid #c9b992;
+        outline: 5px solid #1a0e08;
+        box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.45);
+        padding: 0.8rem;
+        font-family: 'Pixelify Sans', sans-serif;
+      }
+      .minimap-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 1rem;
+        color: #fff4d6;
+        margin-bottom: 0.65rem;
+      }
+      .minimap-head h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        line-height: 1;
+        text-shadow: 2px 2px 0 #1a0e08;
+      }
+      .minimap-head p {
+        margin: 0.25rem 0 0;
+        color: #d8c7a2;
+        font-size: 0.9rem;
+      }
+      .minimap-close {
+        font-family: inherit;
+        font-size: 1.2rem;
+        font-weight: 700;
+        width: 32px;
+        height: 32px;
+        color: #fff4d6;
+        background: var(--accent);
+        border: 3px solid #5c4126;
+        outline: 2px solid #1a0e08;
+        cursor: pointer;
+      }
+      .minimap-frame {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 640 / 496;
+        background: #111;
+        border: 5px solid #3a2418;
+        outline: 3px solid #090604;
+        box-shadow: inset 0 0 0 5px rgba(255, 244, 214, 0.08);
+        overflow: hidden;
+      }
+      .minimap-img {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%;
+        image-rendering: pixelated; opacity: 0.76;
+        filter: contrast(1.05) brightness(0.74);
+      }
+      .minimap-grid {
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(90deg, transparent calc(50% - 1px), rgba(50, 255, 94, 0.7) calc(50% - 1px), rgba(50, 255, 94, 0.7) calc(50% + 1px), transparent calc(50% + 1px)),
+          linear-gradient(0deg, transparent calc(50% - 1px), rgba(50, 255, 94, 0.7) calc(50% - 1px), rgba(50, 255, 94, 0.7) calc(50% + 1px), transparent calc(50% + 1px));
+        pointer-events: none;
+      }
+      .minimap-overlay { position: absolute; inset: 0; pointer-events: none; }
+      .minimap-markers { position: absolute; inset: 0; pointer-events: auto; }
+      .minimap-marker {
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        transition: transform 0.08s, filter 0.08s;
+      }
+      .marker-dot {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 16px;
+        height: 16px;
+        background: #e89653;
+        border: 4px solid #fff4d6;
+        outline: 3px solid #d82918;
+        box-shadow: 0 0 14px rgba(232, 150, 83, 0.9);
+      }
+      .marker-label {
+        position: absolute;
+        left: 50%;
+        top: 20px;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        color: #fff4d6;
+        background: rgba(42, 26, 16, 0.88);
+        padding: 0.08rem 0.25rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-shadow: 1px 1px 0 #1a0e08;
+      }
+      .minimap-marker:hover {
+        transform: scale(1.12);
+        filter: brightness(1.15);
+        z-index: 4;
+      }
+      .minimap-player {
+        position: absolute; width: 12px; height: 12px;
+        background: #fff4d6; border: 3px solid #ffffff; outline: 3px solid #3a2418;
+        border-radius: 50%; pointer-events: none;
+        transition: left 0.1s linear, top 0.1s linear; z-index: 5;
+        box-shadow: 0 0 14px rgba(255, 244, 214, 0.8);
+      }
+      .minimap-hint {
+        margin: 0.65rem 0 0; text-align: center;
+        font-size: 0.95rem; color: var(--card-bg);
+        text-shadow: 1px 1px 0 var(--shadow); line-height: 1.2;
+      }
+
+      .mobile-controls {
+        position: fixed;
+        z-index: 40;
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        justify-content: space-between;
+        align-items: end;
+        pointer-events: none;
+      }
+      .mobile-dpad {
+        position: relative;
+        width: 112px;
+        height: 112px;
+        pointer-events: auto;
+      }
+      .dpad-btn,
+      .enter-btn,
+      .mobile-list {
+        font-family: 'Pixelify Sans', sans-serif;
+        color: #fff4d6;
+        background: rgba(42, 26, 16, 0.86);
+        border: 3px solid #5c4126;
+        outline: 2px solid #3a2418;
+        box-shadow: 3px 3px 0 #1a0e08;
+        touch-action: none;
+      }
+      .dpad-btn {
+        position: absolute;
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        font-size: 1.1rem;
+      }
+      .dpad-btn.up { left: 37px; top: 0; }
+      .dpad-btn.left { left: 0; top: 37px; }
+      .dpad-btn.down { left: 37px; top: 74px; }
+      .dpad-btn.right { left: 74px; top: 37px; }
+      .enter-btn {
+        pointer-events: auto;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      .mobile-list {
+        pointer-events: auto;
+        position: fixed;
+        right: 14px;
+        top: 14px;
+        padding: 0.35rem 0.65rem;
+        text-decoration: none;
+        font-size: 0.9rem;
+      }
+
+      /* === MODAL === */
+      .portal-modal {
+        display: none; position: fixed; inset: 0; z-index: 100;
+        align-items: center; justify-content: center; padding: 1rem;
+      }
+      .portal-modal.is-open { display: flex; }
+      .modal-backdrop {
+        position: absolute; inset: 0;
+        background: rgba(58, 36, 24, 0.7); cursor: pointer;
+      }
+      .modal-frame {
+        position: relative; width: 100%;
+        max-width: min(820px, 95vw);
+        max-height: 88vh;
+        display: flex; flex-direction: column;
+        background: var(--parchment);
+        border: 4px solid var(--border);
+        outline: 4px solid var(--border-dark);
+        box-shadow: 8px 8px 0 var(--shadow);
+        font-family: 'Pixelify Sans', system-ui, sans-serif;
+        animation: modal-pop 0.18s ease-out;
+      }
+      @keyframes modal-pop {
+        from { transform: translate(-4px, -4px); opacity: 0; }
+        to   { transform: translate(0, 0); opacity: 1; }
+      }
+      .modal-title {
+        display: flex; align-items: center; gap: 0.75rem;
+        background: var(--border-dark); color: var(--card-bg);
+        padding: 0.6rem 0.9rem;
+        border-bottom: 4px solid var(--border);
+        flex-shrink: 0;
+      }
+      .modal-icon {
+        font-size: 1.6rem; line-height: 1; flex-shrink: 0;
+        background: var(--parchment);
+        border: 3px solid var(--border); outline: 2px solid var(--border-dark);
+        padding: 0.2rem 0.4rem;
+      }
+      .modal-title h2 { margin: 0; font-size: 1.5rem; font-weight: 700; flex: 1; }
+      .modal-close {
+        font-family: inherit; font-size: 1.3rem; font-weight: 700; line-height: 1;
+        width: 32px; height: 32px; padding: 0;
+        background: var(--accent); color: var(--card-bg);
+        border: 3px solid var(--border-dark); outline: 2px solid var(--border);
+        box-shadow: 2px 2px 0 #000; cursor: pointer;
+      }
+      .modal-close:hover { background: var(--accent-3); }
+      .modal-close:active { transform: translate(2px, 2px); box-shadow: 0 0 0 #000; }
+      .modal-body {
+        flex: 1; overflow-y: auto;
+        padding: 1.25rem 1.5rem;
+        color: var(--fg);
+        font-size: 1.02rem; line-height: 1.55;
+      }
+      .modal-body p { margin: 0 0 0.75rem; }
+      .modal-body .lead { font-size: 1.08rem; }
+      .modal-body .muted { color: var(--muted); }
+      .modal-body code {
+        background: var(--card-bg); padding: 0.1em 0.4em;
+        border: 1px solid var(--border); font-size: 0.95em;
+      }
+      .modal-body a { color: var(--accent); }
+      .modal-body a:hover { color: var(--accent-3); }
+      .modal-body .link-list { list-style: none; padding: 0; margin: 0.5rem 0; }
+      .modal-body .link-list li { padding: 0.25rem 0; }
+      .modal-footer {
+        padding: 0.9rem 1.5rem 1.25rem;
+        border-top: 3px solid var(--border);
+        flex-shrink: 0;
+      }
+      .modal-btn {
+        display: inline-block;
+        font-family: inherit; font-size: 1rem; font-weight: 600;
+        color: var(--card-bg); background: var(--accent);
+        border: 3px solid var(--border-dark); outline: 2px solid var(--border);
+        box-shadow: 4px 4px 0 var(--shadow);
+        padding: 0.5rem 1rem; text-decoration: none; cursor: pointer;
+      }
+      .modal-btn:hover { background: var(--accent-3); color: var(--card-bg); }
+      .modal-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
+
+      /* Welcome modal */
+      .welcome-frame { max-width: min(560px, 95vw); }
+      .howto {
+        list-style: none; padding: 0; margin: 0.5rem 0;
+        display: flex; flex-direction: column; gap: 0.65rem;
+      }
+      .howto li {
+        font-size: 1rem; line-height: 1.5;
+        padding: 0.45rem 0.65rem;
+        background: var(--card-bg);
+        border: 2px solid var(--border);
+      }
+      .kbd-row { display: inline-flex; gap: 0.15rem; vertical-align: middle; }
+      kbd {
+        display: inline-block;
+        min-width: 1.5em;
+        padding: 0.05em 0.45em;
+        font-family: 'Pixelify Sans', monospace;
+        font-size: 0.92em; font-weight: 700;
+        color: var(--card-bg);
+        background: var(--border-dark);
+        border: 2px solid var(--shadow);
+        outline: 1px solid var(--border);
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      /* === Modal content lists === */
+      .modal-body .list,
+      .modal-body .leet-list {
+        list-style: none; padding: 0; margin: 0.75rem 0 0;
+        display: flex; flex-direction: column; gap: 0.6rem;
+      }
+      .modal-body .card,
+      .modal-body .row {
+        background: var(--card-bg);
+        border: 3px solid var(--border);
+        outline: 1px solid var(--border-dark);
+        padding: 0.65rem 0.85rem;
+      }
+      .modal-body .card-link,
+      .modal-body .row-link {
+        display: block; text-decoration: none; color: var(--fg);
+      }
+      .modal-body .card-link:hover .card-title,
+      .modal-body .row-link:hover .row-title { color: var(--accent); }
+      .modal-body .card-head,
+      .modal-body .row-link {
+        display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+      }
+      .modal-body .card-title,
+      .modal-body .row-title {
+        font-weight: 700; font-size: 1.05rem; color: var(--accent);
+      }
+      .modal-body a.card-title { text-decoration: none; }
+      .modal-body a.card-title:hover { color: var(--accent-3); }
+      .modal-body .card-date,
+      .modal-body .row-side {
+        font-size: 0.85rem; color: var(--muted); font-weight: 500;
+      }
+      .modal-body .card-sub { color: var(--muted); margin: 0.2rem 0; font-size: 0.95rem; }
+      .modal-body .card-summary { margin: 0.4rem 0 0; color: var(--muted); font-size: 0.95rem; }
+      .modal-body .row-main { display: flex; align-items: baseline; gap: 0.4rem; }
+      .modal-body .row-muted { color: var(--muted); }
+      .modal-body .tags {
+        margin: 0.3rem 0; display: flex; flex-wrap: wrap; gap: 0.25rem;
+      }
+      .modal-body .tag {
+        font-size: 0.8rem; color: var(--muted);
+        background: var(--parchment);
+        border: 1px solid var(--border);
+        padding: 0.05em 0.45em;
+      }
+      .modal-body .card-actions { display: flex; gap: 0.35rem; }
+      .modal-body .mini-btn {
+        font-size: 0.82rem; padding: 0.15rem 0.5rem;
+        color: var(--card-bg); background: var(--accent);
+        border: 2px solid var(--border-dark);
+        text-decoration: none; font-weight: 500;
+      }
+      .modal-body .mini-btn.alt { background: var(--accent-2); }
+      .modal-body .mini-btn:hover { background: var(--accent-3); }
+
+      /* LeetCode rows */
+      .modal-body .leet-list li {
+        background: var(--card-bg);
+        border: 2px solid var(--border);
+      }
+      .modal-body .leet-row {
+        display: flex; align-items: center; gap: 0.6rem;
+        padding: 0.45rem 0.7rem;
+        text-decoration: none; color: var(--fg);
+      }
+      .modal-body .leet-row:hover { background: var(--accent-3); color: var(--card-bg); }
+      .modal-body .leet-row:hover .leet-pid { color: var(--card-bg); }
+      .modal-body .leet-pid {
+        font-weight: 700; color: var(--accent);
+        min-width: 3.5rem; flex-shrink: 0; font-variant-numeric: tabular-nums;
+      }
+      .modal-body .leet-title { flex: 1; font-weight: 500; }
+      .modal-body .leet-diff {
+        font-size: 0.78rem; padding: 0.05em 0.55em;
+        border: 2px solid var(--border-dark);
+        color: white; flex-shrink: 0;
+      }
+      .modal-body .leet-diff.diff-easy { background: var(--easy); }
+      .modal-body .leet-diff.diff-medium { background: var(--medium); }
+      .modal-body .leet-diff.diff-hard { background: var(--hard); }
+
+      @media (max-width: 700px) {
+        body.game-started .mobile-controls { display: flex; }
+        body.game-started .minimap-toggle {
+          left: auto;
+          right: 14px;
+          bottom: 86px;
+          width: 104px;
+          height: 84px;
+          padding: 10px 9px 11px 17px;
+        }
+        .minimap-toggle::before,
+        .minimap-toggle::after {
+          left: -17px;
+          width: 16px;
+          height: 11px;
+          border-width: 3px;
+        }
+        .minimap-toggle::before { top: 22px; }
+        .minimap-toggle::after { top: 45px; }
+        .map-nav {
+          top: 10px;
+          width: calc(100vw - 20px);
+          justify-content: center;
+          padding: 0.35rem 0.55rem;
+        }
+        .map-nav-brand { display: none; }
+        .map-nav-links { justify-content: center; }
+        .map-nav-btn { font-size: 0.78rem; padding: 0.18rem 0.34rem; }
+        .minimap-panel { width: min(96vw, 560px); padding: 0.55rem; }
+        .minimap-head h2 { font-size: 1.05rem; }
+        .minimap-head p { font-size: 0.78rem; }
+        .marker-label { font-size: 0.66rem; }
+      }
+    </style>
+  </body>
+</html>

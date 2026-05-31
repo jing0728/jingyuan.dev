@@ -1,0 +1,149 @@
+# Dependencies
+node_modules/
+
+# Build output and framework caches
+dist/
+.astro/
+.vercel/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs and local process output
+*.log
+*.err
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Tiled local state
+*.tiled-session
+
+# Source archives and editable art source files
+*.zip
+*.aseprite
+
+# Keep the GitHub repo lean: ignore full local art packs by default,
+# then opt back into the exact runtime assets referenced by the site/map.
+public/assets/cute-fantasy/*.png
+!public/assets/cute-fantasy/player.png
+
+public/assets/map/Cute_Fantasy/**/*.png
+public/assets/map/Cute_Fantasy/**/*.txt
+!public/assets/map/Cute_Fantasy/Animals/Bee/Bee_Nest.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Houses/Limestone/House_1_Limestone_Base_Red.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Houses/Stone/House_2_Stone_Green_Blue.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Houses/Wood/House_1_Wood_Green_Black.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Houses/Wood/House_4_Wood_Green_Red.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Houses/Wood/House_5_Wood_Base_Blue.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Unique_Buildings/Barn/Barn_Base_Black.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Unique_Buildings/Coop/Coop_Base_Blue.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Unique_Buildings/Greenhouse/GreenHouse_Green.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Unique_Buildings/Inn/Inn_Red.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Unique_Buildings/Silo/Silo.png
+!public/assets/map/Cute_Fantasy/Buildings/Buildings/Unique_Buildings/Stalls/Market_Stalls.png
+!public/assets/map/Cute_Fantasy/Crops/Crops.png
+!public/assets/map/Cute_Fantasy/Crops/Grapes_Bower.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Benches.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Camp_Decor.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Fence_Big.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Fountain.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Hay_Bales.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Lanter_Posts.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Nests.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Outdoor_Decor.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Outdoor_Decor_Animations/Flower_Animations/Not_Potted/Flowers_1_Anim.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Scarecrows.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Signs.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/Water_Troughs.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/White_Fence.png
+!public/assets/map/Cute_Fantasy/Outdoor decoration/barrels.png
+!public/assets/map/Cute_Fantasy/Tiles/Bridge/Bridge_Wood.png
+!public/assets/map/Cute_Fantasy/Tiles/Bridge/Bridge_Wood_1.png
+!public/assets/map/Cute_Fantasy/Tiles/FarmLand/FarmLand_Tile.png
+!public/assets/map/Cute_Fantasy/Tiles/FarmLand/FarmLand_Wet_Tile.png
+!public/assets/map/Cute_Fantasy/Tiles/Grass/Grass_3_Middle.png
+!public/assets/map/Cute_Fantasy/Tiles/Grass/Grass_Tiles_1.png
+!public/assets/map/Cute_Fantasy/Tiles/Grass/Grass_Tiles_1_Blob_TEST_1.png
+!public/assets/map/Cute_Fantasy/Tiles/Grass/Grass_Tiles_3.png
+!public/assets/map/Cute_Fantasy/Tiles/Grass/Path_Middle.png
+!public/assets/map/Cute_Fantasy/Tiles/Hedge_Tiles.png
+!public/assets/map/Cute_Fantasy/Tiles/Pavement_Tiles.png
+!public/assets/map/Cute_Fantasy/Tiles/Water/Water_Middle.png
+!public/assets/map/Cute_Fantasy/Tiles/Water/Water_Stone_Tile_1.png
+!public/assets/map/Cute_Fantasy/Tiles/Water/Water_Tile_1.png
+!public/assets/map/Cute_Fantasy/Tiles/Water/Water_Tile_2.png
+!public/assets/map/Cute_Fantasy/Trees/Big_Birch_Tree.png
+!public/assets/map/Cute_Fantasy/Trees/Big_Oak_Tree.png
+!public/assets/map/Cute_Fantasy/Trees/Medium_Fruit_Tree.png
+!public/assets/map/Cute_Fantasy/Trees/Medium_Oak_Tree.png
+!public/assets/map/Cute_Fantasy/Trees/Small_Birch_Tree.png
+!public/assets/map/Cute_Fantasy/Trees/Small_Oak_Tree.png
+
+public/assets/map/Cute_Fantasy_Free/**/*.png
+public/assets/map/Cute_Fantasy_Free/**/*.txt
+!public/assets/map/Cute_Fantasy_Free/Animals/Pig/Pig.png
+
+public/assets/map/generated/*.png
+!public/assets/map/generated/bartender_katy_row4_anim.png
+!public/assets/map/generated/bee_left.png
+!public/assets/map/generated/bee_left_anim.png
+!public/assets/map/generated/bee_right.png
+!public/assets/map/generated/bee_right_anim.png
+!public/assets/map/generated/butterfly_red_row4_anim.png
+!public/assets/map/generated/butterfly_red_row6_anim.png
+!public/assets/map/generated/butterfly_red_row7_anim.png
+!public/assets/map/generated/chef_chloe_row7_anim.png
+!public/assets/map/generated/chicken_07_row3_mirror_anim.png
+!public/assets/map/generated/cow_right.png
+!public/assets/map/generated/cow_right_anim.png
+!public/assets/map/generated/farmer_bob_row12_anim.png
+!public/assets/map/generated/farmer_buba_row1_anim.png
+!public/assets/map/generated/fisherman_fin_row10_anim.png
+!public/assets/map/generated/fisherman_fin_row9_anim.png
+!public/assets/map/generated/flowers_1_potted_row1_anim.png
+!public/assets/map/generated/flowers_1_potted_row2_anim.png
+!public/assets/map/generated/flowers_2_potted_row3_anim.png
+!public/assets/map/generated/flowers_2_potted_row4_anim.png
+!public/assets/map/generated/flowers_3_potted_row5_anim.png
+!public/assets/map/generated/flowers_3_potted_row6_anim.png
+!public/assets/map/generated/flowers_4_potted_row10_anim.png
+!public/assets/map/generated/flowers_4_potted_row7_anim.png
+!public/assets/map/generated/flowers_4_potted_row8_anim.png
+!public/assets/map/generated/flowers_4_potted_row9_anim.png
+!public/assets/map/generated/goose_row3_anim.png
+!public/assets/map/generated/pig_anim.png
+!public/assets/map/generated/sheep_front_black.png
+!public/assets/map/generated/sheep_front_black_anim.png
+!public/assets/map/generated/static_tiles_merged_render.png
+!public/assets/map/generated/static_tiles_merged_tileset.png
+!public/assets/map/generated/swan_left.png
+!public/assets/map/generated/swan_swim_left.png
+!public/assets/map/generated/swan_swim_left_anim.png
+!public/assets/map/generated/swan_swim_right_row8_anim.png
+
+public/assets/map/Sprout Lands - UI Pack - Basic pack/**/*.png
+public/assets/map/Sprout Lands - UI Pack - Basic pack/**/*.ttf
+public/assets/map/Sprout Lands - UI Pack - Basic pack/**/*.txt
+!public/assets/map/Sprout Lands - UI Pack - Basic pack/Sprite sheets/Sprite sheet for Basic Pack.png
+!public/assets/map/Sprout Lands - UI Pack - Basic pack/fonts/pixel-letters-7-8x14-preview.png
+
+public/assets/map/Old_Sprites/
+public/assets/map/Player_Aseprite_Files/
+public/assets/map/Player_Aseprite_Files.zip
+public/assets/map/map.tmx
+public/assets/map/map.tiled-project
+public/assets/map/village-reference.png
+public/assets/map/brick-road.png
+public/assets/ui-pack/

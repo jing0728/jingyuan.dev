@@ -1,0 +1,35 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntry } from '../../lib/content';
+import { render } from 'astro:content';
+
+const { slug } = Astro.params;
+const entry = await getVisibleEntry('projects', slug!, Astro.request);
+if (!entry) return Astro.redirect('/projects');
+const { Content } = await render(entry);
+---
+<Base title={`${entry.data.title} · jingyuan.dev`} description={entry.data.summary}>
+  <article class="frame">
+    <header>
+      <h1>{entry.data.title}</h1>
+      <div class="meta">
+        {entry.data.tech.map((t) => <span class="tag">{t}</span>)}
+        {entry.data.private && <span class="badge-private">private</span>}
+      </div>
+      <div class="row-links">
+        {entry.data.repo && <a href={entry.data.repo} class="pixel-btn small">GitHub ↗</a>}
+        {entry.data.demo && <a href={entry.data.demo} class="pixel-btn small alt">Demo ↗</a>}
+      </div>
+    </header>
+    <Content />
+  </article>
+  <p><a href="/projects" class="back">← Back to projects</a></p>
+</Base>
+
+<style>
+  .meta { margin: 0 0 0.75rem; }
+  .row-links { margin: 0 0 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .pixel-btn.small { font-size: 0.9rem; padding: 0.3rem 0.7rem; }
+  .pixel-btn.alt { background: var(--accent-2); }
+  .back { font-weight: 600; }
+</style>

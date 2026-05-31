@@ -1,0 +1,29 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntry } from '../../lib/content';
+import { render } from 'astro:content';
+
+const { slug } = Astro.params;
+const entry = await getVisibleEntry('learning', slug!, Astro.request);
+if (!entry) return Astro.redirect('/learning');
+const { Content } = await render(entry);
+---
+<Base title={`${entry.data.title} · jingyuan.dev`} description={entry.data.summary}>
+  <article class="frame">
+    <header>
+      <h1>{entry.data.title}</h1>
+      <div class="meta">
+        <time>{entry.data.date.toISOString().slice(0, 10)}</time>
+        {entry.data.tags.map((t) => <span class="tag">#{t}</span>)}
+        {entry.data.private && <span class="badge-private">private</span>}
+      </div>
+    </header>
+    <Content />
+  </article>
+  <p><a href="/learning" class="back">← Back to learning</a></p>
+</Base>
+
+<style>
+  .meta { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.95rem; }
+  .back { font-weight: 600; }
+</style>

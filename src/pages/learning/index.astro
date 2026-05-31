@@ -1,0 +1,47 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntries } from '../../lib/content';
+
+const posts = await getVisibleEntries('learning', Astro.request);
+---
+<Base title="Learning · jingyuan.dev" description="Notes from things I'm learning.">
+  <header class="page-head">
+    <h1>📚 Learning</h1>
+    <p>Notes from things I'm reading, watching, and figuring out.</p>
+  </header>
+
+  {posts.length === 0 ? (
+    <div class="frame empty">No notes yet. Add one in <code>src/content/learning/</code>.</div>
+  ) : (
+    <ul class="list">
+      {posts.map((p) => (
+        <li class="frame">
+          <a href={`/learning/${p.id}`} class="title">{p.data.title}</a>
+          {p.data.private && <span class="badge-private">private</span>}
+          <div class="meta">
+            <time>{p.data.date.toISOString().slice(0, 10)}</time>
+            {p.data.tags.map((t) => <span class="tag">#{t}</span>)}
+          </div>
+          {p.data.summary && <p class="summary">{p.data.summary}</p>}
+        </li>
+      ))}
+    </ul>
+  )}
+</Base>
+
+<style>
+  .page-head { margin-bottom: 1.5rem; }
+  .page-head p { color: var(--muted); margin: 0; }
+  .list { list-style: none; padding: 0; }
+  .list .frame { margin-bottom: 1.25rem; }
+  .title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--accent);
+    border-bottom: 3px solid transparent;
+  }
+  .title:hover { border-bottom-color: var(--accent); }
+  .meta { margin-top: 0.5rem; color: var(--muted); font-size: 0.95rem; }
+  .summary { color: var(--muted); margin: 0.5rem 0 0; }
+  .empty { text-align: center; color: var(--muted); }
+</style>

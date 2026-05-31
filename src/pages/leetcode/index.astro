@@ -1,0 +1,49 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntries } from '../../lib/content';
+
+const entries = await getVisibleEntries('leetcode', Astro.request);
+---
+<Base title="LeetCode · jingyuan.dev" description="What I learned from each problem.">
+  <header class="page-head">
+    <h1>⛰️ LeetCode</h1>
+    <p>Notes on what I learned from each problem.</p>
+  </header>
+
+  {entries.length === 0 ? (
+    <div class="frame empty">No problems yet. Add one in <code>src/content/leetcode/</code>.</div>
+  ) : (
+    <ul class="list">
+      {entries.map((e) => (
+        <li class="frame">
+          <a href={`/leetcode/${e.id}`} class="title">
+            <span class="pid">{e.data.problemId}.</span> {e.data.title}
+          </a>
+          <span class={`badge-diff ${e.data.difficulty.toLowerCase()}`}>{e.data.difficulty}</span>
+          {e.data.private && <span class="badge-private">private</span>}
+          <div class="meta">
+            {e.data.tags.map((t) => <span class="tag">#{t}</span>)}
+            <time>{e.data.date.toISOString().slice(0, 10)}</time>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )}
+</Base>
+
+<style>
+  .page-head { margin-bottom: 1.5rem; }
+  .page-head p { color: var(--muted); margin: 0; }
+  .list { list-style: none; padding: 0; }
+  .list .frame { margin-bottom: 1rem; }
+  .title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    border-bottom: 3px solid transparent;
+  }
+  .title:hover { border-bottom-color: var(--accent); }
+  .pid { color: var(--muted); margin-right: 0.25em; font-weight: 500; }
+  .meta { margin-top: 0.5rem; color: var(--muted); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .empty { text-align: center; color: var(--muted); }
+</style>

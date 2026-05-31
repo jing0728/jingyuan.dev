@@ -1,0 +1,31 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntry } from '../../lib/content';
+import { render } from 'astro:content';
+
+const { slug } = Astro.params;
+const entry = await getVisibleEntry('leetcode', slug!, Astro.request);
+if (!entry) return Astro.redirect('/leetcode');
+const { Content } = await render(entry);
+---
+<Base title={`${entry.data.problemId}. ${entry.data.title} · jingyuan.dev`}>
+  <article class="frame">
+    <header>
+      <div class="meta-top">
+        <span class={`badge-diff ${entry.data.difficulty.toLowerCase()}`}>{entry.data.difficulty}</span>
+        {entry.data.tags.map((t) => <span class="tag">#{t}</span>)}
+        {entry.data.private && <span class="badge-private">private</span>}
+      </div>
+      <h1>{entry.data.problemId}. {entry.data.title}</h1>
+      <p class="when"><time>{entry.data.date.toISOString().slice(0, 10)}</time></p>
+    </header>
+    <Content />
+  </article>
+  <p><a href="/leetcode" class="back">← Back to LeetCode</a></p>
+</Base>
+
+<style>
+  .meta-top { margin-bottom: 0.5rem; }
+  .when { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.95rem; }
+  .back { font-weight: 600; }
+</style>

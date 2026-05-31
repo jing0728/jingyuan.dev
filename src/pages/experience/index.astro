@@ -1,0 +1,65 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntries } from '../../lib/content';
+
+const roles = await getVisibleEntries('experience', Astro.request);
+
+const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
+---
+<Base title="Work · jingyuan.dev" description="Where I've worked and what I built.">
+  <header class="page-head">
+    <h1>🌾 Work</h1>
+    <p>Fields I've farmed.</p>
+  </header>
+
+  {roles.length === 0 ? (
+    <div class="frame empty">No roles yet. Add one in <code>src/content/experience/</code>.</div>
+  ) : (
+    <ul class="list">
+      {roles.map((r) => (
+        <li class="frame">
+          <div class="row-top">
+            <a href={`/experience/${r.id}`} class="title">{r.data.title}</a>
+            <span class="dates">{fmt(r.data.startDate)} – {fmt(r.data.endDate)}</span>
+          </div>
+          <div class="company">
+            <strong>{r.data.company}</strong>
+            {r.data.location && <span class="loc"> · {r.data.location}</span>}
+            {r.data.private && <span class="badge-private">private</span>}
+          </div>
+          <div class="meta">
+            {r.data.tech.map((t) => <span class="tag">{t}</span>)}
+          </div>
+          {r.data.summary && <p class="summary">{r.data.summary}</p>}
+        </li>
+      ))}
+    </ul>
+  )}
+</Base>
+
+<style>
+  .page-head { margin-bottom: 1.5rem; }
+  .page-head p { color: var(--muted); margin: 0; }
+  .list { list-style: none; padding: 0; }
+  .list .frame { margin-bottom: 1.25rem; }
+  .row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--accent);
+    border-bottom: 3px solid transparent;
+  }
+  .title:hover { border-bottom-color: var(--accent); }
+  .dates { color: var(--muted); font-size: 0.95rem; }
+  .company { margin: 0.25rem 0; }
+  .loc { color: var(--muted); }
+  .meta { margin: 0.5rem 0; }
+  .summary { color: var(--muted); margin: 0.5rem 0 0; }
+  .empty { text-align: center; color: var(--muted); }
+</style>

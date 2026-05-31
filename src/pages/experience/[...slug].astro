@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getVisibleEntry } from '../../lib/content';
+import { render } from 'astro:content';
+
+const { slug } = Astro.params;
+const entry = await getVisibleEntry('experience', slug!, Astro.request);
+if (!entry) return Astro.redirect('/experience');
+const { Content } = await render(entry);
+
+const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
+---
+<Base title={`${entry.data.title} · ${entry.data.company} · jingyuan.dev`} description={entry.data.summary}>
+  <article class="frame">
+    <header>
+      <h1>{entry.data.title}</h1>
+      <div class="company">
+        <strong>{entry.data.company}</strong>
+        {entry.data.location && <span class="loc"> · {entry.data.location}</span>}
+        <span class="dates"> · {fmt(entry.data.startDate)} – {fmt(entry.data.endDate)}</span>
+        {entry.data.private && <span class="badge-private">private</span>}
+      </div>
+      <div class="meta">
+        {entry.data.tech.map((t) => <span class="tag">{t}</span>)}
+      </div>
+    </header>
+    <Content />
+  </article>
+  <p><a href="/experience" class="back">← Back to work</a></p>
+</Base>
+
+<style>
+  .company { margin: 0.25rem 0; }
+  .loc, .dates { color: var(--muted); }
+  .meta { margin: 0.5rem 0 1.5rem; }
+  .back { font-weight: 600; }
+</style>
