@@ -4,7 +4,7 @@ import vercel from '@astrojs/vercel';
 import auth from 'auth-astro';
 
 export default defineConfig({
-  site: 'https://jingyuan.dev',
+  site: 'https://jingyuan-dev-spda.vercel.app',
   output: 'server',
   adapter: vercel(),
   integrations: [mdx(), auth()],
