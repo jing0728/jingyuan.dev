@@ -2,7 +2,9 @@
 import Base from '../../layouts/Base.astro';
 import { getVisibleEntries } from '../../lib/content';
 
-const roles = await getVisibleEntries('experience', Astro.request);
+const allRoles = await getVisibleEntries('experience', Astro.request);
+// Hide secondary-language entries from the list; they're accessible via the toggle on the primary page
+const roles = allRoles.filter((r) => r.data.lang !== 'zh');
 
 const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
 ---
@@ -20,6 +22,7 @@ const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
         <li class="frame">
           <div class="row-top">
             <a href={`/experience/${r.id}`} class="title">{r.data.title}</a>
+            {r.data.langPair && <span class="badge-bilingual">🌐</span>}
             <span class="dates">{fmt(r.data.startDate)} – {fmt(r.data.endDate)}</span>
           </div>
           <div class="company">
@@ -54,6 +57,12 @@ const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
     font-weight: 600;
     color: var(--accent);
     border-bottom: 3px solid transparent;
+  }
+  .badge-bilingual {
+    font-size: 0.9rem;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+    border-bottom: none;
   }
   .title:hover { border-bottom-color: var(--accent); }
   .dates { color: var(--muted); font-size: 0.95rem; }

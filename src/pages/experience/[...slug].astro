@@ -6,7 +6,23 @@ import { render } from 'astro:content';
 const { slug } = Astro.params;
 const entry = await getVisibleEntry('experience', slug!, Astro.request);
 if (!entry) return Astro.redirect('/experience');
+
 const { Content } = await render(entry);
+
+const thisLang = entry.data.lang ?? 'en';
+
+// Load bilingual pair if available
+let pairEntry = null;
+let PairContent: any = null;
+if (entry.data.langPair) {
+  pairEntry = await getVisibleEntry('experience', entry.data.langPair, Astro.request);
+  if (pairEntry) {
+    const rendered = await render(pairEntry);
+    PairContent = rendered.Content;
+  }
+}
+
+const hasBilingual = !!pairEntry;
 
 const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
 ---
@@ -20,18 +36,101 @@ const fmt = (d?: Date) => d ? d.toISOString().slice(0, 7) : 'Present';
         <span class="dates"> · {fmt(entry.data.startDate)} – {fmt(entry.data.endDate)}</span>
         {entry.data.private && <span class="badge-private">private</span>}
       </div>
-      <div class="meta">
-        {entry.data.tech.map((t) => <span class="tag">{t}</span>)}
+      <div class="meta-row">
+        <div class="meta">
+          {entry.data.tech.map((t) => <span class="tag">{t}</span>)}
+        </div>
+        {hasBilingual && (
+          <div class="lang-toggle" id="lang-toggle">
+            <button class="lang-btn" id="btn-en">EN</button>
+            <button class="lang-btn" id="btn-zh">中</button>
+          </div>
+        )}
       </div>
     </header>
-    <Content />
+
+    {hasBilingual ? (
+      <>
+        <div id="content-en" class="lang-content">
+          {thisLang === 'en' ? <Content /> : PairContent && <PairContent />}
+        </div>
+        <div id="content-zh" class="lang-content">
+          {thisLang === 'zh' ? <Content /> : PairContent && <PairContent />}
+        </div>
+      </>
+    ) : (
+      <Content />
+    )}
   </article>
   <p><a href="/experience" class="back">← Back to work</a></p>
 </Base>
 
+{hasBilingual && (
+  <script define:vars={{ thisLang }}>
+    (function () {
+      const saved = localStorage.getItem('blog-lang');
+      const lang  = saved || thisLang;
+
+      const enDiv = document.getElementById('content-en');
+      const zhDiv = document.getElementById('content-zh');
+      const btnEn = document.getElementById('btn-en');
+      const btnZh = document.getElementById('btn-zh');
+
+      function setLang(l) {
+        enDiv.style.display = l === 'en' ? '' : 'none';
+        zhDiv.style.display = l === 'zh' ? '' : 'none';
+        btnEn.classList.toggle('active', l === 'en');
+        btnZh.classList.toggle('active', l === 'zh');
+        localStorage.setItem('blog-lang', l);
+      }
+
+      setLang(lang);
+      btnEn.addEventListener('click', () => setLang('en'));
+      btnZh.addEventListener('click', () => setLang('zh'));
+    })();
+  </script>
+)}
+
 <style>
   .company { margin: 0.25rem 0; }
   .loc, .dates { color: var(--muted); }
-  .meta { margin: 0.5rem 0 1.5rem; }
+  .meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0.5rem 0 1.5rem;
+  }
+  .meta { display: flex; flex-wrap: wrap; }
+  .lang-toggle {
+    display: flex;
+    flex-shrink: 0;
+    border: 3px solid var(--border-dark);
+    box-shadow: 3px 3px 0 var(--shadow);
+    overflow: hidden;
+  }
+  .lang-btn {
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border: none;
+    cursor: pointer;
+    background: var(--bg-alt);
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .lang-btn + .lang-btn {
+    border-left: 2px solid var(--border-dark);
+  }
+  .lang-btn.active {
+    background: var(--accent);
+    color: var(--card-bg);
+  }
+  .lang-btn:hover:not(.active) {
+    background: var(--border);
+    color: var(--fg);
+  }
   .back { font-weight: 600; }
 </style>
