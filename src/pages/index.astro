@@ -76,7 +76,7 @@ const PORTAL_DATA = {
       <span class="map-nav-brand">jingyuan.dev</span>
       <nav class="map-nav-links">
         <button class="map-nav-btn" type="button" data-route="/about">About</button>
-        <button class="map-nav-btn" type="button" data-route="/experience">Work blog</button>
+        <button class="map-nav-btn" type="button" data-route="/experience">Experience</button>
         <button class="map-nav-btn" type="button" data-route="/learning">Study</button>
         <button class="map-nav-btn" type="button" data-route="/projects">Project</button>
         <button class="map-nav-btn" type="button" data-route="/leetcode">LeetCode</button>
@@ -217,7 +217,7 @@ const PORTAL_DATA = {
         '/resume': () => ({
           meta: { icon: 'CV', title: 'Resume', cta: 'Open full Resume ->', ctaHref: '/experience' },
           bodyHtml: `
-            <p>Short version of my career. The full Work blog has long-form write-ups.</p>
+            <p>Short version of my career. The full Experience page has long-form write-ups.</p>
             ${data.experience.length === 0
               ? `<p class="muted">No roles added yet - see <code>src/content/experience/</code>.</p>`
               : `<ul class="list">
@@ -237,7 +237,7 @@ const PORTAL_DATA = {
           `,
         }),
         '/experience': () => ({
-          meta: { icon: 'WB', title: 'Work blog', cta: 'Open full Work blog ->', ctaHref: '/experience' },
+          meta: { icon: 'EX', title: 'Experience', cta: 'Open full Experience ->', ctaHref: '/experience' },
           bodyHtml: data.experience.length === 0
             ? `<p class="muted">No entries yet. Add MDX files under <code>src/content/experience/</code>.</p>`
             : `<p class="lead">${data.experience.length} role${data.experience.length === 1 ? '' : 's'} logged.</p>
