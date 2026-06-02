@@ -22,7 +22,7 @@ const PORTAL_LAYERS = new Set([
 
 const NICE_LABELS: Record<string, string> = {
   about_me: 'About',
-  Experience: 'Work blog',
+  Experience: 'Experience',
   Study_notes: 'Study',
   Project: 'Project',
   Leetcode: 'LeetCode',

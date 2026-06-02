@@ -11,7 +11,7 @@ const [learning, projects, experience, leetcode] = await Promise.all([
 
 const regions = [
   { href: '/about',      icon: '🏠', label: 'About me',   desc: 'Walk into my house',     count: null as number | null },
-  { href: '/experience', icon: '🌾', label: 'Work',       desc: 'Fields I have farmed',   count: experience.length },
+  { href: '/experience', icon: '🌾', label: 'Experience', desc: 'Fields I have farmed',   count: experience.length },
   { href: '/learning',   icon: '📚', label: 'Learning',   desc: 'Books and notes',        count: learning.length },
   { href: '/projects',   icon: '🔨', label: 'Projects',   desc: 'The workshop',           count: projects.length },
   { href: '/leetcode',   icon: '⛰️', label: 'LeetCode',   desc: 'Into the mines',         count: leetcode.length },
