@@ -1,0 +1,100 @@
+---
+title: "Building an Order Consolidation Checker at FCS"
+company: "FCS Automotive International"
+startDate: 2026-05-01
+endDate: 2026-05-29
+location: "Suwanee, GA"
+tech: ["Python", "gspread", "Google Sheets API", "pandas", "NetSuite"]
+summary: "Built a Python tool that reads NetSuite fulfillment exports and Google Sheets order data to automatically flag which open orders can ship together."
+private: false
+lang: "en"
+langPair: "order-consolidation-checker-zh"
+---
+
+## The Problem
+
+Every day, the shipping team would manually scan through hundreds of open orders trying to figure out which ones could go out together. Same account, same ZIP code — if two orders are heading to the same place, they should probably be in the same box. But between the 7-day ship window, warehouse pick timing, and a Google Sheet that multiple people edit in real time, it was genuinely hard to keep track.
+
+Nobody was dropping the ball exactly. The information existed. It just lived in too many places at once.
+
+## What I Built
+
+A Python script that runs daily, pulls data from two sources, and writes consolidation suggestions directly into the tracking sheet's Note column — without touching anything a human wrote there first.
+
+The two sources:
+
+- **Google Sheets** (`gspread`) — the main order tracking tab, updated constantly by the team
+- **NetSuite Item Fulfillments export** — a daily `.xls` file showing which orders have been picked by the warehouse
+
+The script cross-references them, groups open orders by account + ZIP, applies a set of merge rules, and flags which ones can ship together.
+
+## The Merge Logic
+
+Two orders qualify for consolidation if:
+
+- Same `ACCT#` and `ZIP CODE`
+- Status is `stock order`, `hold`, `FcsRepleshing`, or `send` with today's send date
+- Scheduled ship dates are within 3 days of each other, **or** warehouse pick dates (from the IF export) are within 3 days
+
+One edge case I spent time on: if one order is already picked and another isn't — and the unpicked one has QTY > 300 — the script drops that pair and flags it as a warning instead. Large unstarted orders take too long to pull; waiting for them defeats the point.
+
+For groups with three or more orders, the script builds a compatibility graph — an edge exists between two orders if they pass the time-window check — then finds subsets where every pair is mutually compatible.
+
+The implementation is a greedy iterative max-clique search: try every remaining node as a starting point, greedily expand by adding any node compatible with all current members, keep the largest clique found, remove it from the pool, and repeat. This is not Bron-Kerbosch. Bron-Kerbosch finds all maximal cliques via recursion and backtracking with three carefully maintained sets (P, R, X). It's provably complete but meaningfully more complex to implement and debug.
+
+The trade-off here was deliberate. BK's guarantees only matter when groups are large and adversarially structured — dozens of orders with irregular compatibility edges. In this codebase, groups are bounded by real logistics: same account, same ZIP, within a three-day window. In practice that means two to four orders per group. At that scale, the greedy approach finds the same answer as BK every time, runs in microseconds, and is readable enough that someone picking up the script for the first time can follow what it's doing without knowing what a clique even is.
+
+One detail that mattered: orders that trigger the large-unstarted-QTY exclusion are added to an `excluded_from_merge` set before grouping runs. Without this, an excluded order could slip into a smaller clique that doesn't include the order it conflicted with — it gets cleanly cut from all edges first.
+
+## The Data Pipeline
+
+```
+NetSuite .xls export (38,000+ rows)
+        ↓ filter to active SOs only (~293 matches)
+IF_history tab (Google Sheet)
+        ↓ upsert by so_norm::if_doc key
+Tracking sheet analysis
+        ↓ clique grouping + exclusion rules
+Note column write-back (append only, preserve human notes)
+```
+
+The IF export contains a month of warehouse activity across all customers — around 38,000 rows. Most of it is irrelevant. The 293 figure comes from filtering against SO numbers currently active in the tracking sheet: out of a full month of warehouse records spanning all customers, only those matching open SOs get written to `IF_history`. This keeps the history tab small and the API calls fast.
+
+Write-back uses a `[自动]` tag (`[自动]` is Chinese for "auto-generated") to separate script-written content from anything the team typed manually. Each run refreshes the auto section without touching the human part. The team works in Chinese, so the tag is intentional.
+
+## Things That Broke Along the Way
+
+The NetSuite export looks like a `.xls` file but is actually SpreadsheetML XML. `pandas.read_excel` doesn't handle it — had to parse it with `xml.etree.ElementTree` directly.
+
+Google Sheets API has a write quota. Writing 38,000 rows hit it immediately. Fixing the filter-first logic brought that down to a few hundred rows per run, which stays well under the limit.
+
+The tracking sheet has headers on row 3 with data starting row 4, which breaks `get_all_records()`. Switched to `get_all_values()` with fixed column mapping.
+
+ZIP codes like `00968` get silently cast to integers by Google Sheets, dropping the leading zero. Added a `zfill(5)` pass after reading.
+
+## What It Outputs
+
+In the Google Sheet Note column:
+
+```
+[自动]可与 SO1341649、SO1343206 合发
+```
+
+In the console:
+
+```
+📊 分析池：163 个 SO
+   stock order：126  |  FcsRepleshing：2  |  hold：12  |  今日SEND：23
+
+✅ 可合单 SO：28 张，共 12 组
+⚠️  放弃合并警告：0 张
+🔴 紧急/过期：75 张
+```
+
+## What I'd Do Differently
+
+The clique detection works by trying every node as a starting point and greedily expanding. For two to four orders per group, this finds the correct answer every time. If a future dataset regularly produced groups of ten or more orders, the greedy expansion could theoretically miss the true maximum clique in adversarial edge configurations. Switching to Bron-Kerbosch would fix that — at the cost of more complexity to maintain.
+
+The `IF_history` cleanup runs row-by-row deletion, which gets slow if a lot of SOs disappear at once. A batch delete approach would help.
+
+I'd also add proper logging to a file instead of just printing to console. When something goes wrong at 9am before anyone's had coffee, being able to check a log is better than re-running the script.

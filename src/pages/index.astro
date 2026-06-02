@@ -27,7 +27,7 @@ const PORTAL_DATA = {
     tech: e.data.tech ?? [],
     summary: e.data.summary ?? '',
   })),
-  experience: experience.map((e) => ({
+  experience: experience.filter((e) => e.data.lang !== 'zh').map((e) => ({
     id: e.id,
     title: e.data.title,
     company: e.data.company,

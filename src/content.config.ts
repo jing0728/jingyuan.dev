@@ -9,6 +9,8 @@ const learning = defineCollection({
     tags: z.array(z.string()).default([]),
     summary: z.string().optional(),
     private: z.boolean().default(false),
+    lang: z.enum(['en', 'zh']).optional(),
+    langPair: z.string().optional(),
   }),
 });
 
@@ -22,6 +24,8 @@ const projects = defineCollection({
     tech: z.array(z.string()).default([]),
     summary: z.string().optional(),
     private: z.boolean().default(false),
+    lang: z.enum(['en', 'zh']).optional(),
+    langPair: z.string().optional(),
   }),
 });
 
@@ -36,6 +40,8 @@ const experience = defineCollection({
     tech: z.array(z.string()).default([]),
     summary: z.string().optional(),
     private: z.boolean().default(false),
+    lang: z.enum(['en', 'zh']).optional(),
+    langPair: z.string().optional(),
   }),
 });
 
@@ -48,6 +54,8 @@ const leetcode = defineCollection({
     difficulty: z.enum(['Easy', 'Medium', 'Hard']),
     tags: z.array(z.string()).default([]),
     private: z.boolean().default(false),
+    lang: z.enum(['en', 'zh']).optional(),
+    langPair: z.string().optional(),
   }),
 });
 
