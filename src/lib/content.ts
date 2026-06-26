@@ -32,6 +32,11 @@ export async function getVisibleEntry<K extends CollectionKey>(
   slug: string,
   request: Request,
 ): Promise<CollectionEntry<K> | null> {
-  const entries = await getVisibleEntries(collection, request);
-  return entries.find((e) => e.id === slug) ?? null;
+  // Private pages are hidden from the index but still accessible by direct URL.
+  const entries = await getCollection(collection);
+  const owner = await isOwner(request);
+  const entry = entries.find((e) => e.id === slug);
+  // Any page with a valid slug is accessible by direct URL regardless of private flag.
+  // The private flag only controls visibility in index listings (getVisibleEntries).
+  return entry ?? null;
 }
