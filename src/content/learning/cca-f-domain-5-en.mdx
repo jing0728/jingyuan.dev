@@ -1,0 +1,154 @@
+---
+title: "CCA-F Domain 5: Context Management & Reliability"
+date: 2026-06-26
+tags: [cca-f, claude, context, reliability]
+summary: "Context window management, prompt caching, handoff patterns, confidence calibration, error handling, retry and fallback strategies."
+private: false
+lang: "en"
+langPair: "cca-f-domain-5"
+---
+
+> **CCA-F Study Notes** · [← Domain 4](/learning/cca-f-domain-4-en)
+
+---
+
+## Context Window Management
+
+The context window is the total content Claude can see in a single conversation.
+
+**Includes**: system prompt + conversation history + tool results + current input
+
+**Signs that context is filling up:**
+- Response quality degrades
+- Claude starts forgetting earlier information
+- Token count approaches the limit
+
+### Three Mitigation Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `/compact` | Compress history, retain a summary |
+| Spawn subagents | Delegate tasks to subagents with independent context windows |
+| External storage | Write intermediate results to files/databases instead of keeping them in context |
+
+---
+
+## Prompt Caching
+
+Frequently reused content can be cached to avoid consuming tokens on every call.
+
+**Cache hit conditions**: content must be identical and within the cache TTL
+
+| Cache-worthy | Not Cache-worthy |
+|--------------|-----------------|
+| System prompts | User input that changes every call |
+| Large knowledge bases | |
+| Fixed few-shot examples | |
+
+> 🎯 **Exam Tip**: Prompt caching **reduces cost** — it does not affect output quality.
+
+---
+
+## Handoff Patterns
+
+### Human Handoff
+
+When AI cannot handle a task, transfer to a human:
+- Must provide a **structured summary**: what was done, root cause, recommended next steps
+- Raw conversation logs alone are not sufficient
+
+### Agent Handoff
+
+When one agent passes a task to another:
+- Must **explicitly pass** all necessary context — never assume the receiving agent knows the history
+- Use **structured format** for handoff — not unstructured prose
+
+> 🎯 **Exam Tip**: If the question mentions "starts from scratch" or "lacks context" → the handoff design is broken.
+
+---
+
+## Confidence Calibration
+
+Claude sometimes expresses unwarranted confidence (hallucination).
+
+Require Claude to output a confidence score in system design:
+
+```json
+{
+  "answer": "...",
+  "confidence": 0.85,
+  "reasoning": "..."
+}
+```
+
+- On low confidence, trigger a fallback: human review, additional validation, or refuse to execute
+
+> 🎯 **Exam Tip**: Confidence scoring is a **required** part of reliability design — not optional.
+
+---
+
+## Error Classification & Handling
+
+### Three Error Types
+
+| Error Type | Description | Handling Strategy |
+|------------|-------------|------------------|
+| **Tool error** | Tool execution failed | Return `isError: true`; pass back to Claude for decision |
+| **Reasoning error** | Claude made a logical error | Validation retry loop |
+| **Environment error** | External system issue (network, API timeout) | Retry with backoff; fallback if max retries exceeded |
+
+> ⚠️ **Exam Tip**: You cannot use the same strategy for all error types.
+
+---
+
+## Fallback & Retry Strategies
+
+### Retry
+
+Suitable for **transient failures** (network hiccup, rate limit):
+- **Exponential backoff**: double the wait time between each retry
+- Set a maximum retry count to avoid infinite loops
+
+### Fallback
+
+Used when retries are exhausted:
+- Downgrade to a simpler model
+- Return cached result
+- Hand off to a human
+
+> 🎯 **Exam Tip**: Retry solves **transient** problems; Fallback solves **persistent** problems.
+
+---
+
+## Long Context Reliability Techniques
+
+### Lost in the Middle Effect
+
+Place critical information at the beginning or end. For long document analysis, use explicit section headers.
+
+### Progressive Summarization
+
+```
+Complete phase 1 → generate summary
+Complete phase 2 → generate summary (replace phase 1 raw content with its summary)
+Complete phase 3 → ...
+```
+
+After each phase, replace the raw content with a summary to save tokens in subsequent phases.
+
+> 🎯 **Exam Tip**: Actively manage context on long tasks — don't passively wait until it overflows.
+
+---
+
+## Programmatic vs Prompt-based Enforcement
+
+| Approach | Reliability | Pros | Cons | Use Case |
+|----------|-------------|------|------|----------|
+| **Prompt-based** | Probabilistic — non-zero failure rate | Flexible, easy to change | Uncertainty | Soft guidelines, preferences |
+| **Programmatic** | Deterministic — 100% reliable | Certainty | Requires code, less flexible | Hard requirements, security rules, financial compliance |
+
+> 🎯 **Exam Tip**: When the question contains **"prevent entirely" / "hard guarantee" / "zero tolerance"** → must use programmatic enforcement.
+
+---
+
+> **CCA-F Study Notes** · [← Domain 4: Prompt Engineering](/learning/cca-f-domain-4-en)

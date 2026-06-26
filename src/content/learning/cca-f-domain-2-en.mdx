@@ -1,0 +1,197 @@
+---
+title: "CCA-F Domain 2: Tool Design & MCP Integration"
+date: 2026-06-26
+tags: [cca-f, claude, tools, mcp]
+summary: "Tool definition, JSON Schema, tool_choice, error handling, MCP architecture and configuration."
+private: false
+lang: "en"
+langPair: "cca-f-domain-2"
+---
+
+> **CCA-F Study Notes** · [← Domain 1](/learning/cca-f-domain-1-en) · [Domain 3 →](/learning/cca-f-domain-3-en)
+
+---
+
+## Tool Definition & JSON Schema
+
+Tools are defined using JSON Schema:
+
+```json
+{
+  "name": "get_customer_by_id",
+  "description": "Use this tool to retrieve a customer profile by customer ID. Input is a customer_id string. Returns customer name, email, account status, and recent activity.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "customer_id": {
+        "type": "string",
+        "description": "The unique customer ID."
+      }
+    },
+    "required": ["customer_id"]
+  }
+}
+```
+
+### Why Description Matters
+
+Claude decides whether to use a tool **primarily based on the `description`**. A vague description can cause Claude to:
+- Skip the tool entirely
+- Call the wrong tool
+- Pass incorrect parameters
+- Misunderstand the tool's side effects
+
+**Good description template:**
+
+```
+Use this tool when [trigger condition].
+It [does what].
+Input: [required input and format].
+Returns: [structured output fields].
+Do not use this tool for [non-applicable cases].
+This tool [has/does not have] side effects.
+```
+
+### Key Fields
+
+| Field | Purpose |
+|-------|---------|
+| `required` | Tells Claude which parameters must always be provided |
+| `enum` | Restricts a parameter to a fixed set of values — prevents Claude from inventing non-existent values |
+| `name` | Should be clear enough for Claude to understand what the tool does at a glance |
+
+---
+
+## tool_choice Control
+
+| tool_choice | Behavior | Best For |
+|-------------|----------|----------|
+| `"auto"` | Claude decides whether to use a tool | General-purpose agents — user might just be asking a concept question |
+| `"any"` | Must call at least one tool, but Claude picks which | When a tool is definitely needed but the exact tool is uncertain |
+| `{"type": "tool", "name": "xxx"}` | Must call the specified tool | Forcing a specific operation |
+
+> 🎯 **Exam Tip**: When a specific tool is forced, Claude outputs `tool_use` directly — **it does not output a text block first**.
+
+---
+
+## Error Type Quick Reference
+
+| Scenario | errorCategory | isRetryable |
+|----------|---------------|-------------|
+| Format / parameter error | `validation` | `false` ❌ |
+| Insufficient permissions | `permission` | `false` ❌ |
+| Requires approval workflow | `permission` | `false` ❌ |
+| Network timeout / service temporarily unavailable | `transient` | `true` ✅ |
+| Query succeeded but no results | `isError: false` | N/A |
+
+---
+
+## Tool Design Principles
+
+| Principle | Explanation |
+|-----------|-------------|
+| **Atomic** | One tool does one clear operation |
+| **No decision logic** | Decisions belong to Claude; tools handle execution |
+| **Granularity** | Not too coarse (poor control) and not too fine (too many tools, slow agent) |
+| **Idempotent** | Same input called multiple times produces the same result with no duplicate side effects |
+| **Side effects** | Tools with significant side effects must document them clearly in the description |
+| **Structured output** | Return structured data — not a large blob of natural language |
+
+---
+
+## isError Flag — Correct Usage
+
+> **Core rule**: Use `isError` for business failures; use exceptions only for system crashes.
+
+Do not throw exceptions — an uncaught exception can crash the entire agentic loop, leaving Claude no chance to recover.
+
+**Use `isError: true` for:**
+- Customer not found
+- Invalid order ID
+- API returns 404
+- Insufficient permissions
+- Invalid parameter format
+- Search returns no results
+
+**Use exceptions for:**
+- Server startup failure
+- MCP server code crash
+- Connection layer fully broken
+- Internal bugs
+
+```
+Use isError: true for recoverable tool failures.
+Use exceptions only for unexpected system-level failures.
+```
+
+---
+
+## Parallel Tool Call Handling
+
+- Claude can emit multiple `tool_use` blocks in a single response
+- Each `tool_use` **must** have a corresponding `tool_result`
+- All `tool_result` entries go in the same `user` message
+- On partial failure: successful tools return normal data; failed tools return `isError: true`
+
+---
+
+## MCP Architecture
+
+**MCP = Model Context Protocol** — the standard interface between Claude and the outside world.
+
+| Component | Role |
+|-----------|------|
+| **MCP Server** | Exposes external capabilities (tools and resources) |
+| **MCP Client** | Claude's side — calls the MCP Server |
+| **Transport Layer** | Communication layer between MCP Server and MCP Client |
+
+### Three Capability Types on an MCP Server
+
+| Type | Characteristics |
+|------|----------------|
+| **Tools** | Operations Claude can call — have input parameters, return results, may have side effects |
+| **Resources** | Content Claude can read — typically no action taken, more like context |
+| **Prompts** | Prompt templates provided by the server — enable reuse of standard workflows |
+
+---
+
+## MCP Configuration & Scope
+
+| Config File | Scope | What to Put Here |
+|-------------|-------|-----------------|
+| `.mcp.json` | **Project-level** | Project-specific tools, team-shared config |
+| `~/.claude.json` | **User-level** | Personal long-term tools, usable across all projects |
+
+**Priority**: `.mcp.json` overrides `~/.claude.json` (project-level wins)
+
+**MCP Server config fields:**
+- server name
+- command or url
+- args / env
+- API keys (**never hardcode** — pass via environment variables)
+
+> ⚠️ **Secrets should be passed through environment variables, not hardcoded.**
+
+---
+
+## Tool Selection Decision Tree
+
+```
+Know the file path?
+  ├─ Yes → Read it directly
+  └─ No  → Know the filename/pattern?
+             ├─ Yes → Glob to find files
+             └─ No  → Know a keyword in the content?
+                        ├─ Yes → Grep to search content
+                        └─ No  → Bash ls/find to explore
+```
+
+| Tool | Purpose |
+|------|---------|
+| **Grep** | Search for matching text/patterns inside file content |
+| **Edit** | Precise text replacement within a file |
+| **Glob** | List files by name/path pattern (e.g. `*.js`, `**/*.ts`) |
+
+---
+
+> **CCA-F Study Notes** · [← Domain 1](/learning/cca-f-domain-1-en) · [Domain 3: Claude Code Config →](/learning/cca-f-domain-3-en)

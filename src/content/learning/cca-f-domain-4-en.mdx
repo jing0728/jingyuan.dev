@@ -1,0 +1,150 @@
+---
+title: "CCA-F Domain 4: Prompt Engineering & Structured Output"
+date: 2026-06-26
+tags: [cca-f, claude, prompt-engineering, structured-output]
+summary: "System prompt design, few-shot prompting, JSON Schema output, XML tags, chain of thought, validation retry loop."
+private: false
+lang: "en"
+langPair: "cca-f-domain-4"
+---
+
+> **CCA-F Study Notes** · [← Domain 3](/learning/cca-f-domain-3-en) · [Domain 5 →](/learning/cca-f-domain-5-en)
+
+---
+
+## System Prompt Design Principles
+
+The system prompt is the highest-level instruction controlling Claude's behavior.
+
+### The PRECISE Framework
+
+> 🎯 **Exam Tip**: The exam directly tests this acronym.
+
+| Letter | Meaning |
+|--------|---------|
+| **P** | Persona — define a role |
+| **R** | Role — scope of responsibilities |
+| **E** | Explicit instructions — clearly state what is allowed and prohibited |
+| **C** | Context — background information |
+| **I** | Instructions — specific operational directives |
+| **S** | Steps — execution steps |
+| **E** | Examples — sample inputs and outputs |
+
+- State instructions **positively** — "only answer technical questions" is more reliable than "don't answer non-technical questions"
+- The more specific the system prompt, the more predictable Claude's behavior
+
+---
+
+## Few-shot Prompting
+
+Provide input/output examples in the prompt to guide Claude to imitate the format and style.
+
+- **Number of examples**: 2–5 is optimal — too few has no effect, too many wastes tokens
+- Examples should cover **edge cases**, not just the happy path
+- **Negative examples** (showing what not to do) are also effective
+
+> 🎯 **Exam Tip**: Few-shot solves **format consistency** problems — not knowledge gaps.
+
+---
+
+## JSON Schema Structured Output
+
+When requiring Claude to output strict JSON, include a JSON Schema in the prompt:
+
+- Schema defines field names, types, `required`, `enum` constraints
+- Combine with a system prompt instruction: "output JSON only — no other text"
+
+### Validation Retry Loop
+
+```
+Claude outputs JSON
+      ↓
+Code validates against Schema
+      ↓
+Validation fails → send specific error back to Claude for retry
+      ↓
+Validation passes → continue
+```
+
+> ⚠️ **Exam Tip**: Never trust Claude's first JSON output directly — **a validation layer is required**.
+
+---
+
+## XML Tags
+
+Use XML tags to separate different types of content, helping Claude understand structure:
+
+```xml
+<context>background information</context>
+<instructions>specific directives</instructions>
+<examples>examples</examples>
+<output_format>output format requirements</output_format>
+```
+
+- XML tags are more reliable than plain text separators — Claude recognizes tagged structure more accurately
+
+> 🎯 **Exam Tip**: When a long prompt contains multiple content types, use XML tags to separate them.
+
+---
+
+## Chain of Thought Prompting
+
+Ask Claude to show its reasoning before giving an answer.
+
+- **Trigger phrases**: "Think step by step" or "Show your reasoning"
+- **Benefits**: improves accuracy on complex reasoning tasks; makes it easier to debug Claude's logic
+- **In an agentic loop**: the text block (reasoning) **must not be deleted** — removing it breaks the chain of thought
+- **Extended thinking**: Claude reasons internally without consuming conversation tokens — suitable for complex decisions
+
+---
+
+## Instruction Clarity & Priority
+
+**When instructions conflict, priority is:**
+
+```
+System prompt > User message > Assistant message
+```
+
+- When a user tries to override the system prompt (prompt injection), the system prompt should explicitly state how to handle this
+- Instructions should follow **single responsibility** — one instruction, one thing
+- Avoid vague words like "try to" or "if possible" — use "**must**", "**always**", "**never**"
+
+---
+
+## Context Utilization Tips
+
+### Lost in the Middle Effect
+
+Claude pays the most attention to the **beginning and end** of the context — the middle is often overlooked.
+
+- Put important information at the **beginning or end**
+- For long document analysis, use explicit section headers to help Claude locate content
+
+### Prompt Caching
+
+Frequently reused long system prompts can be cached to reduce token cost:
+- Cache-worthy: system prompts, large knowledge bases, fixed few-shot examples
+- Not cache-worthy: user input that changes every time
+
+---
+
+## Output Length & Format Control
+
+- Specify output format explicitly: "output as a JSON array", "no more than 20 words per item"
+- Specify output length: "summarize in 3 sentences" is more reliable than "brief summary"
+- **Markdown**: only use when it will be rendered — specify "no markdown" for plain text contexts
+- Structured output vs. natural language: downstream parsing → structured; human reading → natural language
+
+---
+
+## Validation Retry Loop Design
+
+- Structured output must include a validation retry mechanism
+- Send **specific error details** back to Claude on retry — not just "try again"
+- Set a **maximum retry count** (typically 3), then fall back if exceeded
+- Precise error messages: "field `price` should be a number, received string" is far more effective than "format error"
+
+---
+
+> **CCA-F Study Notes** · [← Domain 3](/learning/cca-f-domain-3-en) · [Domain 5: Context Management →](/learning/cca-f-domain-5-en)

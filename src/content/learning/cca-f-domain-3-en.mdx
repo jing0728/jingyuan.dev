@@ -1,0 +1,151 @@
+---
+title: "CCA-F Domain 3: Claude Code Configuration & Workflows"
+date: 2026-06-26
+tags: [cca-f, claude, claude-code, configuration]
+summary: "CLAUDE.md hierarchy, custom slash commands, skills, subagents, hooks lifecycle, SDK and session management."
+private: false
+lang: "en"
+langPair: "cca-f-domain-3"
+---
+
+> **CCA-F Study Notes** · [← Domain 2](/learning/cca-f-domain-2-en) · [Domain 4 →](/learning/cca-f-domain-4-en)
+
+---
+
+## CLAUDE.md Hierarchy
+
+`CLAUDE.md` is Claude Code's project specification, behavior guidelines, and long-term prompt — Claude automatically reads it every time it enters the project.
+
+```
+~/.claude/CLAUDE.md          ← User level: shared across all projects
+        ↓
+project_root/CLAUDE.md       ← Project level: shared across the whole project
+        ↓
+project/backend/CLAUDE.md    ← Subdirectory level: overrides conflicting rules from parent levels
+```
+
+**Priority**: `Subdirectory > Project > User`
+
+### What Belongs at Each Level
+
+| Level | Appropriate Content |
+|-------|-------------------|
+| **User** | Personal coding style, IDE preferences, output style (no project business rules) |
+| **Project** | Project standards, tech stack, build/test/deploy commands, directory overview |
+| **Subdirectory** | Module-specific rules (overrides conflicting items from parent) |
+
+### .claudeignore
+
+Tells Claude which files to ignore:
+- Reduces context, avoids sensitive files
+- Saves tokens, improves speed
+
+### CLAUDE.md Content Guidelines
+
+- **Project Background**: Help Claude understand the overall project
+- **Code Style**: Be as specific as possible
+- **Prohibitions**: What not to do (Claude follows these well)
+- **Common Commands**: Claude can execute them automatically
+- Team-shared standards go in project level; personal preferences go in user level
+
+---
+
+## Custom Slash Commands
+
+- Reusable workflow shortcuts for the team
+- **Location**: `.claude/commands/` directory — one `.md` file per command
+- **Command name** = filename, e.g. `review.md` → `/review`
+- File content is the prompt template for that command
+- Supports `$ARGUMENTS` placeholder for user input
+- **Subdirectory commands**: `.claude/commands/backend/deploy.md` → `/backend:deploy`
+- **Team distribution**: commit `.claude/commands/` to git so everyone shares the same commands
+
+---
+
+## Skills (SKILL.md)
+
+- Skills are reusable knowledge modules that tell Claude how to complete specific types of tasks
+- **Location**: any path, referenced via CLAUDE.md
+- SKILL.md contains **frontmatter (metadata)** + instruction content
+- Frontmatter fields:
+  - `description`: trigger condition description
+  - `triggers`: keyword trigger list
+- Claude matches the most relevant skill to the current task
+- **Enterprise use**: centralize skill libraries, reference them globally via user-level CLAUDE.md
+
+---
+
+## Subagents in Claude Code
+
+- Claude Code can spawn subagents to handle subtasks in parallel
+- **Subagent configuration**: define subagent scope in CLAUDE.md
+- **Scope isolation**: each subagent can only access its assigned files/directories
+- **Delegation**: the main agent delegates subtasks to subagents and integrates results
+
+> 🎯 **Exam Tip**: Subagent scope must be explicitly defined to prevent unauthorized access.
+
+---
+
+## Hooks Lifecycle
+
+Hooks are scripts that execute automatically when specific events occur.
+
+### Four Lifecycle Events
+
+| Hook | Trigger Point |
+|------|---------------|
+| `PreToolCall` | **Before** a tool is called |
+| `PostToolUse` | **After** a tool is called |
+| `PreCompact` | Before context compression |
+| `Stop` | When the agent stops |
+
+### Exit Code Convention
+
+| Exit Code | Meaning |
+|-----------|---------|
+| `exit 0` | Success — continue execution |
+| `exit 1` | Failure — block the current operation |
+| `exit 2` | Failure — block and send an error message to Claude |
+
+### Common Hook Patterns
+
+| Pattern | Hook | Purpose |
+|---------|------|---------|
+| Security guard | `PreToolCall` | Block dangerous operations (e.g. deleting production DB) |
+| Auto-logging | `PostToolUse` | Log all tool calls to a file |
+| Auto-format | `PostToolUse` | Run linter/formatter after writing a file |
+| Notification | `Stop` | Send Slack notification when task completes |
+
+> 🎯 **Exam Tip**: Hooks are **deterministic enforcement** — not prompt instructions.
+
+---
+
+## Claude Code SDK & Non-interactive Mode
+
+Claude Code SDK allows controlling Claude Code sessions programmatically.
+
+**Non-interactive mode (CI/CD integration)** — use the `-p` flag:
+
+```bash
+claude -p "review this PR and output findings as JSON"
+```
+
+- `-p` flag makes Claude Code accept a prompt, execute, and exit — no interactive wait
+- Suitable for: automation scripts, CI/CD pipelines, scheduled tasks
+- Output format can be specified as JSON for downstream processing
+
+---
+
+## Session Management
+
+| Operation | Command/Method | Description |
+|-----------|---------------|-------------|
+| **Resume** | `--resume <session-name>` | Restore a named session |
+| **Fork** | `fork_session` | Create an independent branch from current session — explore alternatives without polluting the main session |
+| **Compact** | `/compact` | Compress current context, keep summary, free up token space |
+
+> ⚠️ After resuming, you must explicitly tell Claude which files have changed (Stale Context issue).
+
+---
+
+> **CCA-F Study Notes** · [← Domain 2](/learning/cca-f-domain-2-en) · [Domain 4: Prompt Engineering →](/learning/cca-f-domain-4-en)

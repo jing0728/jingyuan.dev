@@ -1,0 +1,151 @@
+---
+title: "CCA-F Domain 1: Agentic Architecture"
+date: 2026-06-26
+tags: [cca-f, claude, agents, architecture]
+summary: "Agentic loop, orchestrator-subagent model, multi-agent topologies, state management, hooks, and session handling."
+private: false
+lang: "en"
+langPair: "cca-f-domain-1"
+---
+
+> **CCA-F Study Notes** · [Domain 2 →](/learning/cca-f-domain-2-en)
+
+---
+
+## Agentic vs Conversational vs Workflow
+
+![Agentic vs Conversational](/assets/cca-f/agentic_vs_conversational.png)
+
+| System | Description |
+|--------|-------------|
+| **Conversational** | Standard chat — the human controls every step, one round at a time |
+| **Workflow** | Predefined steps; Claude follows the flow without autonomous decision-making — suitable for simple, fixed processes |
+| **Agentic** | Goal-driven; Claude decides its own path, decomposes tasks, calls tools, and handles exceptions — requires autonomous decision-making under uncertainty |
+
+**The Agentic Loop** has three core elements:
+
+- **Autonomy**: No human intervention required at each step
+- **Tool Use**: Can call external tools (search, file write, API calls)
+- **Action Loop**: Execute → observe result → execute again, until `stop_reason` fires
+
+---
+
+## Orchestrator-Subagent Model
+
+![Orchestrator-Subagent Model](/assets/cca-f/orchestrator_subagent_model.png)
+
+### Orchestrator Responsibilities
+
+- Receives a large task and decomposes it into subtasks
+- Decides which subtasks run in parallel vs. sequentially
+- Assigns subtasks to different subagents
+- Collects and integrates results
+
+### Subagent Characteristics
+
+- Each subagent has an **independent context window (Context Isolation)** — subagents cannot see each other's state
+- A subagent only knows about the subtask it was assigned
+- On failure, the Orchestrator decides how to handle it (retry / skip / escalate)
+- **No automatic memory** — subagents do not inherit the parent conversation history
+- All required information must be written explicitly into the prompt
+
+---
+
+## Multi-Agent Topologies
+
+![Multi-Agent Topologies](/assets/cca-f/multi_agent_topologies.png)
+
+| Topology | Characteristics | Best For |
+|----------|-----------------|----------|
+| **Hub-and-Spoke** | Centralized control | Parallel, independent subtasks |
+| **Pipeline** | Sequential processing — output of step N is input of step N+1 | Fixed workflows; Pipeline is the simplest DAG (no branching) |
+| **DAG (Directed Acyclic Graph)** | Directed = edges have direction; Acyclic = no cycles; Graph = nodes + edges | Complex dependency relationships |
+| **Peer-to-Peer** | Agents collaborate as equals | High coordination cost — use with caution |
+
+---
+
+## State Management
+
+### In-context State
+
+- ✅ Fast to read — Claude sees it directly
+- ❌ Limited by context window size — multiple subagents cannot share it
+
+### External State (database / file / vector store)
+
+- ✅ Persistent, shareable across subagents, no token cost
+- ❌ Requires an extra tool call to read
+- **Use when**: task is long, spans sessions, or multiple agents need to share state
+
+---
+
+## stop_reason Quick Reference
+
+| stop_reason | Meaning |
+|-------------|---------|
+| `end_turn` | Claude believes the task is complete and stops voluntarily |
+| `tool_use` | Claude needs to call a tool — the loop is **not finished** |
+| `max_tokens` | Token limit reached — must handle (truncate or error) |
+| `stop_sequence` | A predefined stop string was triggered |
+
+> ⚠️ **Exam Tip**: `stop_reason` is the only reliable loop termination signal. Never judge loop completion from Claude's natural language ("I'm done").
+
+**Progress-less agentic loop**: wrong tool selection causes the loop to keep running without making progress toward the goal.
+
+---
+
+## Coordinator Pattern
+
+**Coordinator**: Dynamic routing — decides which subagents to invoke based on the complexity of the incoming query.
+
+**Task Tool**:
+- Spawning a subagent requires the Task Tool
+- The coordinator's `allowedTools` must include `"Task"`
+
+---
+
+## Multi-Step Workflow Enforcement
+
+| Approach | Reliability | Use Case |
+|----------|-------------|----------|
+| **Prompt-based guidance** | Not 100% reliable — LLM may not follow | Soft guidelines |
+| **Programmatic enforcement** | Enforced at code level — deterministic | When business rules require certain compliance |
+
+> 🎯 **Exam Tip**: When the question contains **"prevent entirely" / "hard guarantee" / "zero tolerance"** → must use programmatic enforcement, not prompt instructions alone.
+
+---
+
+## Agent SDK Hooks
+
+| Hook | Trigger Point | Purpose |
+|------|---------------|---------|
+| **PostToolUse Hook** | After tool returns result, before the model sees it | Normalize/transform data |
+| **Tool Call Interception Hook** | Before the tool actually executes | Check for policy violations |
+
+---
+
+## Task Decomposition
+
+| Strategy | Best For |
+|----------|----------|
+| **Adaptive decomposition** | Open-ended investigation — exploratory tasks |
+| **Fixed Pipeline** | Predictable workflow — tasks with fixed steps |
+
+---
+
+## Session Management
+
+![Session Management](/assets/cca-f/image.png)
+
+```bash
+# Resume a named session
+--resume <session-name>
+```
+
+- **Resume**: Restore a previously named session
+- **Fork Session**: Create multiple independent branches from the same analysis baseline
+- **Stale Context**: When resuming an old session, prior tool results may be outdated — you must explicitly tell Claude which files have changed
+
+---
+
+> **CCA-F Study Notes** · [Domain 2: Tool Design & MCP →](/learning/cca-f-domain-2-en)
