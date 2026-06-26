@@ -1,0 +1,152 @@
+---
+title: "CCA-F Domain 5: Context Management & Reliability"
+date: 2026-06-26
+tags: [cca-f, claude, context, reliability]
+summary: "Context window management, prompt caching, handoff patterns, confidence calibration, error handling, retry and fallback strategies."
+private: false
+---
+
+> **CCA-F Study Notes** · [← Domain 4](/learning/cca-f-domain-4)
+
+---
+
+## Context Window 管理
+
+Context window 是 Claude 在单次对话中能看到的所有内容总量。
+
+**内容包括**：system prompt + 对话历史 + tool results + 当前输入
+
+**Context 快满的信号**：
+- 响应质量下降
+- 开始忘记早期信息
+- token 接近上限
+
+### 三种应对策略
+
+| 策略 | 说明 |
+|------|------|
+| `/compact` | 压缩历史，保留摘要 |
+| Spawn subagents | 把任务分给独立 context 的 subagent |
+| 外部存储 | 把中间结果写到文件/数据库，不留在 context 里 |
+
+---
+
+## Prompt Caching
+
+重复使用的内容可以缓存，避免每次都消耗 token。
+
+**缓存命中条件**：内容完全一致，且在缓存有效期内
+
+| 适合缓存 | 不适合缓存 |
+|----------|----------|
+| System prompt | 每次都变化的用户输入 |
+| 大型知识库 | |
+| 固定的 few-shot examples | |
+
+> 🎯 **Exam Tip**: Prompt caching **降低成本**，不影响输出质量。
+
+---
+
+## Handoff 模式
+
+### Human Handoff（人工交接）
+
+AI 无法处理时移交给人类：
+- 必须提供**结构化摘要**：已做了什么、根因是什么、建议下一步
+- 不能只给原始对话记录
+
+### Agent Handoff（智能体交接）
+
+一个 agent 把任务传给另一个：
+- 必须**显式传递**所有必要 context，不能假设对方知道历史
+- 用**结构化格式**传递，不用非结构化 prose
+
+> 🎯 **Exam Tip**: 题目出现 "starts from scratch" / "lacks context" → handoff 设计有问题。
+
+---
+
+## Confidence Calibration（置信度校准）
+
+Claude 有时对自己的答案过于自信（hallucination）。
+
+设计系统时要求 Claude 输出置信度评分：
+
+```json
+{
+  "answer": "...",
+  "confidence": 0.85,
+  "reasoning": "..."
+}
+```
+
+- 低置信度时触发 fallback：人工审核、额外验证、或拒绝执行
+
+> 🎯 **Exam Tip**: Confidence score 是 reliability 设计的一部分，**不是可选的**。
+
+---
+
+## 错误分类与处理
+
+### 三种错误类型
+
+| 错误类型 | 说明 | 处理策略 |
+|----------|------|----------|
+| **Tool error** | 工具执行失败 | 返回 `isError: true`，传回 Claude 让它决策 |
+| **Reasoning error** | Claude 推理错误 | Validation retry loop |
+| **Environment error** | 外部系统问题（网络、API 超时） | Retry with backoff，超过次数走 fallback |
+
+> ⚠️ **Exam Tip**: 不能用同一种策略处理所有错误。
+
+---
+
+## Fallback 与 Retry 策略
+
+### Retry（重试）
+
+适合**暂时性失败**（网络抖动、rate limit）：
+- **指数退避（exponential backoff）**：每次重试间隔翻倍
+- 设置最大重试次数，避免无限循环
+
+### Fallback（降级）
+
+重试失败后的备用方案：
+- 降级到更简单的模型
+- 返回缓存结果
+- 人工介入
+
+> 🎯 **Exam Tip**: Retry 解决**暂时性**问题，Fallback 解决**持久性**问题。
+
+---
+
+## Long Context 可靠性技巧
+
+### Lost in the Middle 效应
+
+重要信息放开头或结尾，长文档分析用显式 section header。
+
+### 渐进式摘要（Progressive Summarization）
+
+```
+完成阶段 1 → 生成摘要
+完成阶段 2 → 生成摘要（用摘要替代阶段 1 原始内容）
+完成阶段 3 → ...
+```
+
+每完成一个阶段生成摘要，后续阶段用摘要替代原始内容，节省 token。
+
+> 🎯 **Exam Tip**: 长任务要**主动管理** context，不能被动等到爆满。
+
+---
+
+## Programmatic vs Prompt-based Enforcement
+
+| 方式 | 可靠性 | 优点 | 缺点 | 适合场景 |
+|------|--------|------|------|----------|
+| **Prompt-based** | Probabilistic，有非零失败率 | 灵活，容易修改 | 不确定性 | Soft guidelines，偏好设置 |
+| **Programmatic** | Deterministic，100% 可靠 | 确定性 | 需要写代码，不灵活 | Hard requirements，安全规则，金融合规 |
+
+> 🎯 **Exam Tip**: 题目出现 **"prevent entirely" / "hard guarantee" / "zero tolerance"** → 必须用 programmatic。
+
+---
+
+> **CCA-F Study Notes** · [← Domain 4: Prompt Engineering](/learning/cca-f-domain-4)

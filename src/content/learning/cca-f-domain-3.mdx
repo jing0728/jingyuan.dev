@@ -1,0 +1,149 @@
+---
+title: "CCA-F Domain 3: Claude Code Configuration & Workflows"
+date: 2026-06-26
+tags: [cca-f, claude, claude-code, configuration]
+summary: "CLAUDE.md hierarchy, custom slash commands, skills, subagents, hooks lifecycle, SDK and session management."
+private: false
+---
+
+> **CCA-F Study Notes** · [← Domain 2](/learning/cca-f-domain-2) · [Domain 4 →](/learning/cca-f-domain-4)
+
+---
+
+## CLAUDE.md 层级结构
+
+`CLAUDE.md` 是 Claude Code 的项目说明书 + 行为规范 + 长期 prompt，Claude 每次进入项目都会自动读取它。
+
+```
+~/.claude/CLAUDE.md          ← User 级：所有项目共享
+        ↓
+project_root/CLAUDE.md       ← Project 级：整个项目共享
+        ↓
+project/backend/CLAUDE.md    ← Subdirectory 级：子目录覆盖上层冲突规则
+```
+
+**优先级**：`Subdirectory > Project > User`
+
+### 各层应该放什么
+
+| 层级 | 适合放的内容 |
+|------|------------|
+| **User 级** | 个人编码习惯、IDE 偏好、输出风格（不能放项目业务规则） |
+| **Project 级** | 项目规范、技术栈、Build 命令、测试命令、部署方式、目录说明 |
+| **Subdirectory 级** | 子模块专属规则（覆盖上层冲突项） |
+
+### .claudeignore
+
+告诉 Claude 哪些文件不要看：
+- 减少 context，避免敏感文件
+- 避免浪费 Token，提高速度
+
+### CLAUDE.md 内容写法
+
+- **Project Background**：让 Claude 理解整个项目
+- **Code Style**：指令越具体越好
+- **禁止事项**：不要做什么（Claude 很容易遵守）
+- **常用命令**：Claude 可以自动执行
+- 团队共享的规范放 project 级，个人偏好放 user 级
+
+---
+
+## Custom Slash Commands
+
+- 自定义斜杠命令，让团队复用常见工作流
+- **存放位置**：`.claude/commands/` 目录下，每个命令一个 `.md` 文件
+- **命令名** = 文件名，比如 `review.md` → `/review`
+- 文件内容就是这个命令的 prompt 模板
+- 支持 `$ARGUMENTS` 占位符接收用户输入
+- **子目录命令**：`.claude/commands/backend/deploy.md` → `/backend:deploy`
+- **团队分发**：把 `.claude/commands/` 提交到 git，所有人共享
+
+---
+
+## Skills (SKILL.md)
+
+- Skills 是可复用的知识模块，告诉 Claude 如何完成特定类型任务
+- 存放位置：任意路径，通过 CLAUDE.md 引用
+- SKILL.md 包含 **frontmatter（元数据）** + 具体指令内容
+- Frontmatter 字段：
+  - `description`：触发条件描述
+  - `triggers`：关键词触发列表
+- Claude 根据任务匹配最相关的 skill 来执行
+- **企业场景**：把 skill 库集中管理，通过 user 级 CLAUDE.md 全局引用
+
+---
+
+## Subagents in Claude Code
+
+- Claude Code 可以 spawn subagents 并行处理子任务
+- **Subagent 配置**：在 CLAUDE.md 里定义 subagent 的职责范围
+- **Scope 隔离**：每个 subagent 只能访问被分配的文件/目录范围
+- **Delegation**：主 agent 把子任务委托给 subagent，收集结果后整合
+
+> 🎯 **Exam Tip**: Subagent 的 scope 必须明确限定，防止越权访问。
+
+---
+
+## Hooks 生命周期
+
+Hooks 是在特定事件触发时自动执行的脚本。
+
+### 四个生命周期事件
+
+| Hook | 触发时机 |
+|------|----------|
+| `PreToolCall` | 工具调用**之前**触发 |
+| `PostToolUse` | 工具调用**之后**触发 |
+| `PreCompact` | context 压缩之前触发 |
+| `Stop` | agent 停止时触发 |
+
+### Hook 退出码约定
+
+| 退出码 | 含义 |
+|--------|------|
+| `exit 0` | 成功，继续执行 |
+| `exit 1` | 失败，阻止当前操作 |
+| `exit 2` | 失败，同时向 Claude 发送错误消息 |
+
+### 常用 Hook 模式
+
+| 模式 | 使用的 Hook | 用途 |
+|------|-------------|------|
+| 安全拦截 | `PreToolCall` | 检查危险操作（比如删除生产数据库） |
+| 自动日志 | `PostToolUse` | 记录所有工具调用到日志文件 |
+| 格式化 | `PostToolUse` | 在写文件后自动跑 linter/formatter |
+| 通知 | `Stop` | 任务完成后发 Slack 通知 |
+
+> 🎯 **Exam Tip**: Hook 是 **deterministic enforcement**，不是 prompt 指令。
+
+---
+
+## Claude Code SDK & 非交互模式
+
+Claude Code SDK 允许通过代码控制 Claude Code session。
+
+**非交互模式（CI/CD 集成）**：使用 `-p` flag：
+
+```bash
+claude -p "review this PR and output findings as JSON"
+```
+
+- `-p` flag 让 Claude Code 接收一个 prompt，执行完直接退出，不等待用户交互
+- 适合：自动化脚本、CI/CD pipeline、定时任务
+- 输出格式可以指定 JSON，方便下游处理
+
+---
+
+## Session 管理
+
+| 操作 | 命令/方式 | 说明 |
+|------|-----------|------|
+| **Resume** | `--resume <session-name>` | 恢复命名 session |
+| **Fork** | `fork_session` | 从当前 session 创建独立分支，探索不同方案不污染主 session |
+| **Compact** | `/compact` | 压缩当前 context，保留摘要，释放 token 空间 |
+
+> ⚠️ resume 后必须显式告知 Claude 哪些文件发生了变化（Stale Context 问题）。
+
+---
+
+> **CCA-F Study Notes** · [← Domain 2](/learning/cca-f-domain-2) · [Domain 4: Prompt Engineering →](/learning/cca-f-domain-4)

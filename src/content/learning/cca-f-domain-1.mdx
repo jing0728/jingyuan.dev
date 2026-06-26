@@ -1,0 +1,151 @@
+---
+title: "CCA-F Domain 1: Agentic Architecture"
+date: 2026-06-26
+tags: [cca-f, claude, agents, architecture]
+summary: "Agentic loop, orchestrator-subagent model, multi-agent topologies, state management, hooks, and session handling."
+private: false
+---
+
+import { Image } from 'astro:assets';
+
+> **CCA-F Study Notes** · [Domain 2 →](/learning/cca-f-domain-2)
+
+---
+
+## Agentic vs Conversational vs Workflow
+
+![Agentic vs Conversational](/assets/cca-f/agentic_vs_conversational.png)
+
+| System | Description |
+|--------|-------------|
+| **Conversational** | 普通聊天，一轮一轮，人在控制每一步 → 只需要对话 |
+| **Workflow** | 有固定流程，步骤预先定义好，Claude 按流程走，不自主决策 → 任务简单，流程固定 |
+| **Agentic** | 目标驱动，Claude 自己决定怎么走，自主拆解任务，调用工具，处理异常 → 需要自主决策，处理不确定性 |
+
+**Agentic Loop** 由三个核心要素构成：
+
+- **自主性 (Autonomy)**：不需要人每步都介入
+- **工具调用 (Tool Use)**：能调用外部工具（搜索、写文件、调用 API）
+- **行动循环 (Action Loop)**：执行 → 观察结果 → 再执行，直到 `stop_reason` 触发
+
+---
+
+## Orchestrator-Subagent 模型
+
+![Orchestrator-Subagent Model](/assets/cca-f/orchestrator_subagent_model.png)
+
+### Orchestrator 职责
+
+- 接收大任务，分解成小子任务
+- 决定哪些子任务并行，哪些串行
+- 分配给不同的 subagent 执行
+- 收集结果并整合
+
+### Subagent 特征
+
+- 每个 subagent 有独立的上下文窗口（**Context Isolation**），不互相看到对方的状态
+- Subagent 只知道被分配的那个子任务
+- 出错时由 Orchestrator 决定如何处理（重试 / 跳过 / 上报）
+- **没有自动记忆**，不会自动知道 parent conversation history
+- 必须把需要的信息写进 prompt 里
+
+---
+
+## Multi-Agent Topologies
+
+![Multi-Agent Topologies](/assets/cca-f/multi_agent_topologies.png)
+
+| Topology | 特点 | 适合场景 |
+|----------|------|----------|
+| **Hub-and-Spoke** | 中心控制 | 并行独立子任务 |
+| **Pipeline** | 顺序处理，前一步输出是下一步输入 | 固定流程，Pipeline 是最简单的 DAG（无分叉） |
+| **DAG (Directed Acyclic Graph)** | 有向无环图，Directed → 有方向，Acyclic → 不能形成循环，Graph → 节点+边 | 复杂依赖关系 |
+| **Peer-to-Peer** | 对等协作 | 协调成本高，慎用 |
+
+---
+
+## State Management
+
+### In-context 状态
+
+- ✅ 读取快，Claude 直接看到
+- ❌ 上下文窗口有限，多个 Subagent 无法共享
+
+### 外部状态（数据库 / 文件 / 向量库）
+
+- ✅ 持久化，可以跨 subagent 共享，不占 token
+- ❌ 需要额外工具调用才能读取
+- **适用场景**：任务长、需要跨会话、多 Agent 共享状态
+
+---
+
+## stop_reason 速查
+
+| stop_reason | 含义 |
+|-------------|------|
+| `end_turn` | Claude 认为完成，主动结束 |
+| `tool_use` | Claude 需要调用工具，循环**未结束** |
+| `max_tokens` | 达到 token 上限，需要处理（截断 or 错误） |
+| `stop_sequence` | 触发了预设的停止字符串 |
+
+> ⚠️ **Exam Tip**: `stop_reason` 是唯一可靠的 loop termination signal，不能根据 Claude 自然语言说"完成"来判断结束。
+
+**progress-less agentic loop**：工具选择错误，导致循环没有向目标推进。
+
+---
+
+## Coordinator 模式
+
+**Coordinator**：动态路由 — 根据 query 的复杂度决定调用哪些 subagent。
+
+**Task Tool**：
+- 生成 subagent 需要 Task Tool
+- coordinator 的 `allowedTools` 必须包含 `"Task"`
+
+---
+
+## Multi-Step Workflow Enforcement
+
+| 方式 | 可靠性 | 适合场景 |
+|------|--------|----------|
+| **Prompt-based guidance** | 不是 100% 可靠，LLM 可能不听 | Soft guidelines |
+| **Programmatic enforcement** | 代码层面强制，确定性 | 业务规则需要确定性合规时 |
+
+> 🎯 **Exam Tip**: 当题目出现 **"prevent entirely" / "hard guarantee" / "zero tolerance"** → 必须用 programmatic enforcement，不能只靠 prompt instructions。
+
+---
+
+## Agent SDK Hooks
+
+| Hook | 触发时机 | 用途 |
+|------|----------|------|
+| **PostToolUse Hook** | 工具返回结果之后，模型看到结果之前 | 标准化数据 |
+| **Tool Call Interception Hook** | 在工具真正执行之前拦截 | 检查是否违规 |
+
+---
+
+## Task Decomposition
+
+| 策略 | 适合场景 |
+|------|----------|
+| **Adaptive decomposition** | Open-ended investigation，开放探索型任务 |
+| **Fixed Pipeline** | Predictable workflow，步骤固定的任务 |
+
+---
+
+## Session Management
+
+![Session Management](/assets/cca-f/image.png)
+
+```bash
+# 恢复命名 session
+--resume <session-name>
+```
+
+- **Resume**：恢复一个之前的 named session
+- **Fork Session**：从同一个分析基础上创建多个独立分支
+- **Stale Context**：恢复旧 session 时，之前的 tool results 可能已经过期，必须显式告知 Claude 哪些文件发生了变化
+
+---
+
+> **CCA-F Study Notes** · [Domain 2: Tool Design & MCP →](/learning/cca-f-domain-2)

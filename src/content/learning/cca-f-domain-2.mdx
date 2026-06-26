@@ -1,0 +1,195 @@
+---
+title: "CCA-F Domain 2: Tool Design & MCP Integration"
+date: 2026-06-26
+tags: [cca-f, claude, tools, mcp]
+summary: "Tool definition, JSON Schema, tool_choice, error handling, MCP architecture and configuration."
+private: false
+---
+
+> **CCA-F Study Notes** · [← Domain 1](/learning/cca-f-domain-1) · [Domain 3 →](/learning/cca-f-domain-3)
+
+---
+
+## Tool Definition & JSON Schema
+
+工具通过 JSON Schema 定义：
+
+```json
+{
+  "name": "get_customer_by_id",
+  "description": "Use this tool to retrieve a customer profile by customer ID. Input is a customer_id string. Returns customer name, email, account status, and recent activity.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "customer_id": {
+        "type": "string",
+        "description": "The unique customer ID."
+      }
+    },
+    "required": ["customer_id"]
+  }
+}
+```
+
+### Description 的重要性
+
+Claude 决定是否使用工具**主要靠 `description`**。Description 写得太模糊，Claude 可能会：
+- 不调用工具
+- 调用错工具
+- 传错参数
+- 误解工具的副作用
+
+**好的 description 模板：**
+
+```
+Use this tool when [trigger condition].
+It [does what].
+Input: [required input and format].
+Returns: [structured output fields].
+Do not use this tool for [non-applicable cases].
+This tool [has/does not have] side effects.
+```
+
+### 关键字段
+
+| 字段 | 作用 |
+|------|------|
+| `required` | 告诉 Claude 哪些参数一定要提供 |
+| `enum` | 限制参数只能是某些固定值，防止 Claude 发明不存在的值，让工具调用更稳定 |
+| `name` | 要清晰，让 Claude 一眼知道工具做什么 |
+
+---
+
+## tool_choice 控制
+
+| tool_choice | 行为 | 适合场景 |
+|-------------|------|----------|
+| `"auto"` | Claude 自己决定要不要用工具 | 普通 agent，用户可能只是问概念 |
+| `"any"` | 必须至少调用一个工具，但可以自己选 | 确定需要工具，但不确定用哪个 |
+| `{"type": "tool", "name": "xxx"}` | 必须调用指定工具 | 强制执行特定操作 |
+
+> 🎯 **Exam Tip**: 强制指定工具时，Claude 会直接输出 `tool_use`，**不会先输出 text block**。
+
+---
+
+## 错误类型速查
+
+| 场景 | errorCategory | isRetryable |
+|------|---------------|-------------|
+| 格式 / 参数错误 | `validation` | `false` ❌ |
+| 权限不足 | `permission` | `false` ❌ |
+| 需要审批流程 | `permission` | `false` ❌ |
+| 网络超时 / 服务暂时不可用 | `transient` | `true` ✅ |
+| 查询成功但无结果 | `isError: false` | N/A |
+
+---
+
+## 工具设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **Atomic** | 一个工具只干一件事 |
+| **No decision logic** | 决策应该由 Claude 做，工具负责执行 |
+| **Granularity** | 颗粒度不能太粗（控制能力差）也不能太细（选择困难，调用次数多） |
+| **Idempotent** | 同样输入调用多次，结果一样，不会造成重复副作用 |
+| **Side effect** | 副作用大的工具要在 description 里明确说明 |
+| **Structured output** | 返回值应该结构化，不要返回一大段难以解析的自然语言 |
+
+---
+
+## isError Flag 的正确使用
+
+> **核心原则**：业务失败用 `isError`，系统崩溃才考虑异常。
+
+不要抛异常（throw exception）——抛异常可能导致整个 agentic loop 崩溃，Claude 没有机会恢复。
+
+**应该用 `isError: true` 的情况：**
+- customer not found
+- order ID invalid
+- API 返回 404
+- 权限不足
+- 参数格式不对
+- 搜索无结果
+
+**可以用异常的情况：**
+- server 启动失败
+- MCP server 代码崩溃
+- 连接层完全断掉
+- 内部 bug
+
+```
+Use isError: true for recoverable tool failures.
+Use exceptions only for unexpected system-level failures.
+```
+
+---
+
+## 并行 Tool Call 处理
+
+- Claude 可以一次发多个 `tool_use`
+- 每个 `tool_use` 都**必须**有对应 `tool_result`
+- 所有 `tool_result` 放在同一条 `user` message 里
+- 部分失败时：成功的返回正常数据，失败的返回 `isError: true`
+
+---
+
+## MCP 基础架构
+
+**MCP = Model Context Protocol**，是 Claude 和外部世界之间的标准接口。
+
+| 组件 | 职责 |
+|------|------|
+| **MCP Server** | 暴露外部能力（工具和资源提供方） |
+| **MCP Client** | Claude 这边负责调用 MCP Server |
+| **Transport Layer** | MCP Server 和 MCP Client 之间的通信层 |
+
+### MCP Server 提供三种能力
+
+| 类型 | 特点 |
+|------|------|
+| **Tools** | Claude 可以调用的操作，有输入参数，返回结果，可能有副作用 |
+| **Resources** | Claude 可以读取的内容，通常不执行动作，更像 context |
+| **Prompts** | MCP Server 提供的提示模板，帮助复用标准提示词 |
+
+---
+
+## MCP 配置与作用域
+
+| 配置文件 | 作用域 | 适合放什么 |
+|----------|--------|----------|
+| `.mcp.json` | **项目级** | 某个项目专属工具，团队共享配置 |
+| `~/.claude.json` | **用户级** | 个人长期使用的工具，所有项目都能用 |
+
+**优先级**：`.mcp.json` > `~/.claude.json`（项目级覆盖用户级）
+
+**MCP Server 配置字段：**
+- server name
+- command or url
+- args / env
+- API keys（**不要硬编码**，通过环境变量传入）
+
+> ⚠️ **Secrets should be passed through environment variables, not hardcoded.**
+
+---
+
+## 工具选择决策树
+
+```
+知道文件路径？
+  ├─ 是 → Read 直接读
+  └─ 否 → 知道文件名/模式？
+            ├─ 是 → Glob 找文件
+            └─ 否 → 知道文件内容关键词？
+                      ├─ 是 → Grep 搜内容
+                      └─ 否 → Bash ls/find 探索目录
+```
+
+| 工具 | 作用 | 类比 |
+|------|------|------|
+| **Grep** | 在文件内容里搜索匹配的文本/模式 | `grep` 命令 |
+| **Edit** | 对文件进行精确的文本替换 | 外科手术式修改 |
+| **Glob** | 按文件名/路径模式列出文件 | `*.js`、`**/*.ts` |
+
+---
+
+> **CCA-F Study Notes** · [← Domain 1](/learning/cca-f-domain-1) · [Domain 3: Claude Code Config →](/learning/cca-f-domain-3)

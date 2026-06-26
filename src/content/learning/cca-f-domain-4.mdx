@@ -1,0 +1,148 @@
+---
+title: "CCA-F Domain 4: Prompt Engineering & Structured Output"
+date: 2026-06-26
+tags: [cca-f, claude, prompt-engineering, structured-output]
+summary: "System prompt design, few-shot prompting, JSON Schema output, XML tags, chain of thought, validation retry loop."
+private: false
+---
+
+> **CCA-F Study Notes** · [← Domain 3](/learning/cca-f-domain-3) · [Domain 5 →](/learning/cca-f-domain-5)
+
+---
+
+## 系统提示设计原则
+
+System prompt 是控制 Claude 行为的最高层指令。
+
+### PRECISE 框架
+
+> 🎯 **Exam Tip**: 考试会直接考这个词。
+
+| 字母 | 含义 |
+|------|------|
+| **P** | Persona — 角色定义 |
+| **R** | Role — 职责范围 |
+| **E** | Explicit instructions — 明确禁止/允许的行为 |
+| **C** | Context — 背景信息 |
+| **I** | Instructions — 具体操作指令 |
+| **S** | Steps — 执行步骤 |
+| **E** | Examples — 示例 |
+
+- 指令要**正向表达**——"只回答技术问题"比"不要回答非技术问题"更可靠
+- System prompt 越具体，Claude 行为越可预测
+
+---
+
+## Few-shot Prompting
+
+在 prompt 里提供输入输出示例，引导 Claude 模仿格式和风格。
+
+- **示例数量**：2-5 个最佳，太少没效果，太多占 token
+- 示例要覆盖**边界情况**，不只是正常情况
+- **负面示例**（错误示范）也有效——告诉 Claude 不要做什么
+
+> 🎯 **Exam Tip**: Few-shot 解决**格式一致性**问题，不是解决知识不足的问题。
+
+---
+
+## JSON Schema 结构化输出
+
+要求 Claude 输出严格 JSON 时，在 prompt 里提供 JSON Schema：
+
+- Schema 定义字段名、类型、`required`、`enum` 等约束
+- 结合 system prompt 指令："只输出 JSON，不要输出其他文字"
+
+### Validation Retry Loop（验证重试循环）
+
+```
+Claude 输出 JSON
+      ↓
+代码验证 Schema
+      ↓
+验证失败 → 把错误信息发回给 Claude 重试
+      ↓
+验证成功 → 继续
+```
+
+> ⚠️ **Exam Tip**: 不要信任 Claude 第一次输出的 JSON 就直接用，**必须有验证层**。
+
+---
+
+## XML 标签的使用
+
+用 XML 标签分隔不同类型的内容，帮助 Claude 理解结构：
+
+```xml
+<context>背景信息</context>
+<instructions>具体指令</instructions>
+<examples>示例</examples>
+<output_format>输出格式要求</output_format>
+```
+
+- XML 标签比纯文字分隔更可靠，Claude 对标签结构识别更准确
+
+> 🎯 **Exam Tip**: 长 prompt 里有多种内容类型时，用 XML 标签分隔。
+
+---
+
+## Chain of Thought Prompting
+
+让 Claude 在给出答案前先展示推理过程。
+
+- **触发方式**："Think step by step" 或 "Show your reasoning"
+- **优点**：提高复杂推理准确率，方便 debug Claude 的思路
+- **在 agentic loop 里**：保留 text block（推理过程）**不能删**，删了会丢失 chain of thought
+- **Extended thinking**：Claude 内部推理，不占对话 token，适合复杂决策
+
+---
+
+## 指令清晰度与优先级
+
+**指令冲突时的优先级**：
+
+```
+System prompt > User message > Assistant message
+```
+
+- 用户试图覆盖 system prompt（prompt injection）：system prompt 应明确说明如何处理
+- 指令要**单一职责**——一条指令只说一件事
+- 避免模糊词："尽量"、"可能的话"——用"**必须**"、"**总是**"、"**禁止**"
+
+---
+
+## Context 利用技巧
+
+### Lost in the Middle 效应
+
+Claude 对 context 开头和结尾注意力最强，**中间容易忽略**。
+
+- 重要信息放**开头或结尾**，不要埋在中间
+- 长文档分析：用显式 section header 分隔，帮助 Claude 定位
+
+### Prompt Caching
+
+重复使用的长 system prompt 可以缓存，节省 token 成本：
+- 适合缓存：system prompt、大型知识库、固定的 few-shot examples
+- 不适合缓存：每次都变化的用户输入
+
+---
+
+## 输出长度与格式控制
+
+- 明确指定输出格式："输出为 JSON 数组"、"每条不超过 20 字"
+- 指定输出长度："用 3 句话总结"比"简短总结"更可靠
+- **Markdown 格式**：需要渲染时才用，纯文本场景指定"不要用 markdown"
+- 结构化输出 vs 自然语言：下游需要解析 → 结构化；人类阅读 → 自然语言
+
+---
+
+## Validation Retry Loop 设计
+
+- 结构化输出必须有验证重试机制
+- 重试时把**具体错误信息**发回给 Claude，不只是"重试"
+- 设置**最大重试次数**（通常 3 次），超过后走 fallback 流程
+- 错误信息要精确："字段 `price` 应为 number，实际收到 string" 比 "格式错误" 更有效
+
+---
+
+> **CCA-F Study Notes** · [← Domain 3](/learning/cca-f-domain-3) · [Domain 5: Context Management →](/learning/cca-f-domain-5)
