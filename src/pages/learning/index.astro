@@ -2,7 +2,9 @@
 import Base from '../../layouts/Base.astro';
 import { getVisibleEntries } from '../../lib/content';
 
-const posts = await getVisibleEntries('learning', Astro.request);
+const allPosts = await getVisibleEntries('learning', Astro.request);
+// Only show the EN version (or lang-less) of bilingual pairs — zh versions are accessed via the toggle.
+const posts = allPosts.filter((p) => p.data.lang !== 'zh');
 ---
 <Base title="Learning · jingyuan.dev" description="Notes from things I'm learning.">
   <header class="page-head">
