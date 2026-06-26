@@ -93,6 +93,12 @@ const hasBilingual = !!pairEntry;
     margin: 0 0 1.5rem;
   }
   .meta { color: var(--muted); font-size: 0.95rem; }
+  :global(.lang-content img), :global(article img) {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5rem auto;
+  }
   .lang-toggle {
     display: flex;
     flex-shrink: 0;
